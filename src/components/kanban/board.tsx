@@ -7,9 +7,6 @@ import { Column } from './column';
 import { dbService } from '@/lib/db';
 import type { Task } from '@/lib/types';
 
-// Workaround for React Beautiful DnD in React 18 Strict Mode
-const isBrowser = typeof window !== 'undefined';
-
 const columns = [
   { id: 'backlog', title: 'Backlog' },
   { id: 'todo', title: 'To Do' },
@@ -22,7 +19,6 @@ export function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     const initializeDb = async () => {
@@ -37,13 +33,6 @@ export function Board() {
     };
 
     initializeDb();
-  }, []);
-
-  // Enable drag and drop after initial render to avoid strict mode issues
-  useEffect(() => {
-    if (isBrowser) {
-      setEnabled(true);
-    }
   }, []);
 
   async function loadTasks() {
@@ -67,53 +56,83 @@ export function Board() {
       return;
     }
 
-    // Find the task being dragged
-    const task = tasks.find(t => t.id === draggableId);
-    if (!task) return;
-
-    // Create arrays of tasks for the source and destination columns
-    const sourceColumnTasks = tasks.filter(t => t.status === source.droppableId);
-    const destColumnTasks = tasks.filter(t => t.status === destination.droppableId);
-
-    // Remove from source column
-    sourceColumnTasks.splice(source.index, 1);
-
-    // Add to destination column
-    if (source.droppableId === destination.droppableId) {
-      sourceColumnTasks.splice(destination.index, 0, {
-        ...task,
-        status: destination.droppableId as Task['status'],
-      });
-    } else {
-      destColumnTasks.splice(destination.index, 0, {
-        ...task,
-        status: destination.droppableId as Task['status'],
-      });
-    }
-
-    // Combine all tasks
-    const newTasks = tasks.map(t => {
-      if (t.status === source.droppableId) {
-        return sourceColumnTasks[tasks.filter(task => task.status === source.droppableId).indexOf(t)] || t;
-      }
-      if (t.status === destination.droppableId) {
-        return destColumnTasks[tasks.filter(task => task.status === destination.droppableId).indexOf(t)] || t;
-      }
-      return t;
-    });
-
-    // Update state optimistically
-    setTasks(newTasks);
-
     try {
+      // Find the task being dragged
+      const taskToMove = tasks.find(t => t.id === draggableId);
+      if (!taskToMove) return;
+
+      // Create a new array with the updated task status
+      const updatedTasks = tasks.map(task => {
+        if (task.id === draggableId) {
+          return {
+            ...task,
+            status: destination.droppableId as Task['status']
+          };
+        }
+        return task;
+      });
+
+      // Sort tasks by their new positions
+      const reorderedTasks = reorderTasks(
+        updatedTasks,
+        source,
+        destination,
+        taskToMove
+      );
+
+      // Update state immediately
+      setTasks(reorderedTasks);
+
       // Persist the change
-      await dbService.updateTask(task.id, {
-        status: destination.droppableId as Task['status'],
+      await dbService.updateTask(draggableId, {
+        status: destination.droppableId as Task['status']
       });
     } catch (error) {
       console.error('Failed to update task:', error);
-      await loadTasks(); // Reload tasks if update fails
+      // Revert to original state if update fails
+      await loadTasks();
     }
+  }
+
+  function reorderTasks(
+    tasks: Task[],
+    source: { index: number; droppableId: string },
+    destination: { index: number; droppableId: string },
+    movedTask: Task
+  ) {
+    const result = [...tasks];
+
+    // Remove task from source column
+    const sourceColumnTasks = result.filter(t => t.status === source.droppableId);
+    sourceColumnTasks.splice(source.index, 1);
+
+    // Add task to destination column
+    const destColumnTasks = result.filter(t => 
+      t.status === destination.droppableId && t.id !== movedTask.id
+    );
+    destColumnTasks.splice(destination.index, 0, {
+      ...movedTask,
+      status: destination.droppableId as Task['status']
+    });
+
+    // Combine all tasks, preserving order
+    return result.map(task => {
+      if (task.id === movedTask.id) {
+        return {
+          ...task,
+          status: destination.droppableId as Task['status']
+        };
+      }
+      if (task.status === source.droppableId) {
+        const index = sourceColumnTasks.findIndex(t => t.id === task.id);
+        return index !== -1 ? sourceColumnTasks[index] : task;
+      }
+      if (task.status === destination.droppableId) {
+        const index = destColumnTasks.findIndex(t => t.id === task.id);
+        return index !== -1 ? destColumnTasks[index] : task;
+      }
+      return task;
+    });
   }
 
   if (isLoading) {
@@ -122,10 +141,6 @@ export function Board() {
         <div className="text-lg font-medium">Loading...</div>
       </div>
     );
-  }
-
-  if (!enabled) {
-    return null;
   }
 
   return (
