@@ -7,6 +7,9 @@ import { Column } from './column';
 import { dbService } from '@/lib/db';
 import type { Task } from '@/lib/types';
 
+// Workaround for React Beautiful DnD in React 18 Strict Mode
+const isBrowser = typeof window !== 'undefined';
+
 const columns = [
   { id: 'backlog', title: 'Backlog' },
   { id: 'todo', title: 'To Do' },
@@ -19,6 +22,7 @@ export function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
     const initializeDb = async () => {
@@ -33,6 +37,13 @@ export function Board() {
     };
 
     initializeDb();
+  }, []);
+
+  // Enable drag and drop after initial render to avoid strict mode issues
+  useEffect(() => {
+    if (isBrowser) {
+      setEnabled(true);
+    }
   }, []);
 
   async function loadTasks() {
@@ -111,6 +122,10 @@ export function Board() {
         <div className="text-lg font-medium">Loading...</div>
       </div>
     );
+  }
+
+  if (!enabled) {
+    return null;
   }
 
   return (

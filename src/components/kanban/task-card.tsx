@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Draggable } from 'react-beautiful-dnd';
 import { Calendar, Clock, GripVertical, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
@@ -27,7 +27,7 @@ const priorityColors = {
   high: 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/20',
 };
 
-export function TaskCard({ task, index, onTaskUpdated }: TaskCardProps) {
+function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
   async function handleDelete() {
@@ -124,3 +124,6 @@ export function TaskCard({ task, index, onTaskUpdated }: TaskCardProps) {
     </>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const TaskCard = memo(TaskCardComponent);
