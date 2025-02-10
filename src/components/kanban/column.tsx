@@ -1,12 +1,14 @@
 import { TaskCard } from './task-card';
 import type { Task } from '@/lib/types';
+import { PlusCircle } from 'lucide-react';
 
 interface ColumnProps {
   tasks: Task[];
   onTaskUpdated: () => void;
+  onNewTask: () => void;
 }
 
-export function Column({ tasks, onTaskUpdated }: ColumnProps) {
+export function Column({ tasks, onTaskUpdated, onNewTask }: ColumnProps) {
   return (
     <div className="min-h-[50px] space-y-3">
       {tasks.map((task, index) => (
@@ -18,11 +20,15 @@ export function Column({ tasks, onTaskUpdated }: ColumnProps) {
         />
       ))}
       {tasks.length === 0 && (
-        <div className="rounded-lg border border-dashed border-muted-foreground/25 p-4">
-          <p className="text-center text-sm text-muted-foreground">
-            Drop tasks here
+        <button
+          onClick={onNewTask}
+          className="w-full flex flex-col items-center rounded-lg border border-dashed border-muted-foreground/50 bg-muted/50 p-4 transition-colors hover:border-muted-foreground/75 hover:bg-muted/75 hover:cursor-pointer"
+        >
+          <PlusCircle className="h-8 w-8 text-muted-foreground/50" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            Click to add a task
           </p>
-        </div>
+        </button>
       )}
     </div>
   );

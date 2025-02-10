@@ -58,17 +58,15 @@ const formSchema = z.object({
 interface TaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  task?: Task;
-  onTaskCreated?: () => void;
-  onTaskUpdated?: () => void;
+  task: Task | null | undefined;
+  onTaskSaved: () => void;
 }
 
 export function TaskDialog({
   open,
   onOpenChange,
   task,
-  onTaskCreated,
-  onTaskUpdated,
+  onTaskSaved,
 }: TaskDialogProps) {
   const { toast } = useToast();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -134,7 +132,7 @@ export function TaskDialog({
           due_date: values.due_date?.toISOString(),
           description: values.description || null,
         });
-        onTaskUpdated?.();
+        onTaskSaved?.();
       } else {
         await dbService.createTask({
           ...values,
@@ -144,7 +142,7 @@ export function TaskDialog({
           ticket_id: dbService.generateTicketId(),
           description: values.description || null,
         });
-        onTaskCreated?.();
+        onTaskSaved?.();
       }
       toast({
         title: task ? 'Task updated' : 'Task created',

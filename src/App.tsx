@@ -1,11 +1,152 @@
+import { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { Board } from '@/components/kanban/board';
+import { Monitor } from '@/components/monitor';
+import { Database } from '@/components/database';
+import { AuthDialog } from '@/components/auth/auth-dialog';
+import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
+import { ModeToggle } from '@/components/mode-toggle';
+import { Github, Terminal, Database as DatabaseIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setShowAuth(true);
+    }
+  }, [isAuthenticated]);
+
+  if (!isAuthenticated) {
+    return <AuthDialog open={showAuth} onOpenChange={setShowAuth} />;
+  }
+
+  return <>{children}</>;
+}
+
+function Layout() {
+  const { user, setUser } = useAuth();
+  const [showAuth, setShowAuth] = useState(false);
+
+  return (
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 items-center">
+          <div className="mr-4 flex">
+            <Link className="mr-6 flex items-center space-x-2" to="/">
+              <span className="font-bold sm:inline-block">Kanban</span>
+            </Link>
+            <nav className="flex items-center space-x-6 text-sm font-medium">
+              <Link
+                to="/"
+                className={cn(
+                  'transition-colors hover:text-foreground/80',
+                  'text-foreground'
+                )}
+              >
+                Board
+              </Link>
+              <Link
+                to="/monitor"
+                className={cn(
+                  'transition-colors hover:text-foreground/80',
+                  'text-foreground/60'
+                )}
+              >
+                <Terminal className="h-5 w-5" />
+              </Link>
+              <Link
+                to="/database"
+                className={cn(
+                  'transition-colors hover:text-foreground/80',
+                  'text-foreground/60'
+                )}
+              >
+                <DatabaseIcon className="h-5 w-5" />
+              </Link>
+            </nav>
+          </div>
+          <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+            <div className="w-full flex-1 md:w-auto md:flex-none">
+              {/* Add search or other controls here */}
+            </div>
+            <nav className="flex items-center space-x-2">
+              <a
+                href="https://github.com/NubsCarson/kanban"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Button variant="ghost" size="icon">
+                  <Github className="h-5 w-5" />
+                </Button>
+              </a>
+              <ModeToggle />
+              {user ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => setUser(null)}
+                >
+                  Sign Out
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAuth(true)}
+                >
+                  Sign In
+                </Button>
+              )}
+            </nav>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Board />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/monitor"
+            element={
+              <ProtectedRoute>
+                <Monitor />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/database"
+            element={
+              <ProtectedRoute>
+                <Database />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+
+      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
+      <Toaster />
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <main className="min-h-screen bg-background">
-      <Board />
-      <Toaster />
-    </main>
+    <Router>
+      <AuthProvider>
+        <Layout />
+      </AuthProvider>
+    </Router>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { dbService } from '@/lib/db';
-import type { Task } from '@/lib/types';
-import { ArrowLeft, LayoutDashboard, Activity, Clock, CheckCircle2, AlertCircle, Timer, BarChart3, RefreshCcw } from 'lucide-react';
+import type { Task, ChatMessage } from '@/lib/types';
+import { ArrowLeft, LayoutDashboard, Activity, Clock, CheckCircle2, AlertCircle, Timer, BarChart3, RefreshCcw, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,12 @@ interface SystemMetrics {
     completed: number;
     updated: number;
   };
+  chatMetrics: {
+    totalMessages: number;
+    pinnedMessages: number;
+    totalLikes: number;
+    activeUsers: number;
+  };
 }
 
 export function Monitor() {
@@ -38,6 +44,12 @@ export function Monitor() {
       created: 0,
       completed: 0,
       updated: 0,
+    },
+    chatMetrics: {
+      totalMessages: 0,
+      pinnedMessages: 0,
+      totalLikes: 0,
+      activeUsers: new Set().size,
     },
   });
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -76,7 +88,11 @@ export function Monitor() {
 
   async function loadMetrics() {
     try {
-      const tasks = await dbService.getTasks();
+      const [tasks, messages] = await Promise.all([
+        dbService.getTasks(),
+        dbService.getMessages(),
+      ]);
+
       const completed = tasks.filter(t => t.status === 'done').length;
       const inProgress = tasks.filter(t => t.status === 'in_progress').length;
       
@@ -103,6 +119,14 @@ export function Monitor() {
         updated: tasks.filter(t => new Date(t.updated_at) > yesterday).length,
       };
 
+      // Calculate chat metrics
+      const chatMetrics = {
+        totalMessages: messages.length,
+        pinnedMessages: messages.filter(m => m.is_pinned).length,
+        totalLikes: messages.reduce((acc, m) => acc + m.likes.length, 0),
+        activeUsers: new Set(messages.map(m => m.user_id)).size,
+      };
+
       setMetrics({
         total: tasks.length,
         completed,
@@ -110,7 +134,24 @@ export function Monitor() {
         avgCompletionTime: avgTime / (1000 * 60 * 60), // Convert to hours
         tasksByPriority,
         recentActivity,
+        chatMetrics,
       });
+
+      // Add chat-related logs
+      if (messages.length > 0) {
+        const recentMessages = messages
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+          .slice(0, 5);
+
+        addLog('info', 'Recent chat activity', {
+          messages: recentMessages.map(m => ({
+            timestamp: m.timestamp,
+            user_id: m.user_id,
+            likes: m.likes.length,
+            is_pinned: m.is_pinned,
+          })),
+        });
+      }
     } catch (error) {
       console.error('Failed to load metrics:', error);
     }
@@ -197,6 +238,32 @@ export function Monitor() {
             </div>
             <div className="mt-1 text-2xl">
               {metrics.avgCompletionTime.toFixed(1)}
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Metrics */}
+        <div className="rounded border border-green-900/50 bg-black/50 p-4 shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare className="h-4 w-4 text-green-600" />
+            <h3 className="font-bold">Chat System Metrics</h3>
+          </div>
+          <div className="grid grid-cols-4 gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="text-xs text-green-600">Total Messages</div>
+              <div className="text-xl">{metrics.chatMetrics.totalMessages}</div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-xs text-green-600">Pinned Messages</div>
+              <div className="text-xl">{metrics.chatMetrics.pinnedMessages}</div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-xs text-green-600">Total Likes</div>
+              <div className="text-xl">{metrics.chatMetrics.totalLikes}</div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="text-xs text-green-600">Active Users</div>
+              <div className="text-xl">{metrics.chatMetrics.activeUsers}</div>
             </div>
           </div>
         </div>
