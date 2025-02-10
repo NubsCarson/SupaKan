@@ -185,6 +185,41 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     });
   };
 
+  const togglePin = async (messageId: string) => {
+    try {
+      const message = messages.find(m => m.id === messageId);
+      if (!message) return;
+
+      await dbService.updateMessage(messageId, {
+        is_pinned: !message.is_pinned,
+      });
+
+      // Update messages state
+      const updatedMessages = messages.map(m =>
+        m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m
+      );
+      setMessages(updatedMessages);
+
+      // Update pinned messages state
+      if (!message.is_pinned) {
+        setPinnedMessages(prev => [...prev, { ...message, is_pinned: true }]);
+      } else {
+        setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      }
+
+      toast({
+        title: message.is_pinned ? 'Message unpinned' : 'Message pinned',
+        description: 'Message has been updated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update message',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">

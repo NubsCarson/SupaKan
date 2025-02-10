@@ -1,17 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { dbService } from '@/lib/db';
 import type { Task, ChatMessage } from '@/lib/types';
-import { ArrowLeft, LayoutDashboard, Activity, Clock, CheckCircle2, AlertCircle, Timer, BarChart3, RefreshCcw, MessageSquare } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-
-interface LogEntry {
-  timestamp: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  message: string;
-  details?: any;
-}
+import { ArrowLeft, Activity, Database as DatabaseIcon, Users, MessageSquare, CheckCircle, Clock, AlertTriangle, BarChart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SystemMetrics {
   total: number;
@@ -32,59 +26,23 @@ interface SystemMetrics {
   };
 }
 
+interface LogEntry {
+  timestamp: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  message: string;
+  details?: any;
+}
+
 export function Monitor() {
+  const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [metrics, setMetrics] = useState<SystemMetrics>({
-    total: 0,
-    completed: 0,
-    inProgress: 0,
-    avgCompletionTime: 0,
-    tasksByPriority: {},
-    recentActivity: {
-      created: 0,
-      completed: 0,
-      updated: 0,
-    },
-    chatMetrics: {
-      totalMessages: 0,
-      pinnedMessages: 0,
-      totalLikes: 0,
-      activeUsers: new Set().size,
-    },
-  });
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initial system check
-    addLog('info', 'Initializing system monitor...');
-    checkSystem();
     loadMetrics();
-
-    // Set up periodic checks
-    const interval = setInterval(() => {
-      checkSystem();
-      loadMetrics();
-    }, 5000);
-
+    const interval = setInterval(loadMetrics, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    // Auto scroll to bottom of logs
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [logs]);
-
-  async function checkSystem() {
-    try {
-      const tasks = await dbService.getTasks();
-      addLog('success', 'Database connection successful', {
-        taskCount: tasks.length,
-      });
-      analyzeTaskDistribution(tasks);
-    } catch (error) {
-      addLog('error', 'Database connection failed', { error });
-    }
-  }
 
   async function loadMetrics() {
     try {
@@ -93,257 +51,276 @@ export function Monitor() {
         dbService.getMessages(),
       ]);
 
-      const completed = tasks.filter(t => t.status === 'done').length;
-      const inProgress = tasks.filter(t => t.status === 'in_progress').length;
-      
-      // Calculate average completion time for completed tasks
-      const completedTasks = tasks.filter(t => t.status === 'done');
+      const now = Date.now();
+      const completedTasks = tasks.filter(task => task.status === 'done');
+      const inProgressTasks = tasks.filter(task => 
+        ['in_progress', 'in_review'].includes(task.status)
+      );
+
+      // Calculate average completion time
       const avgTime = completedTasks.reduce((acc, task) => {
-        const created = new Date(task.created_at);
-        const updated = new Date(task.updated_at);
-        return acc + (updated.getTime() - created.getTime());
+        const completionTime = new Date(task.updated_at).getTime() - new Date(task.created_at).getTime();
+        return acc + completionTime;
       }, 0) / (completedTasks.length || 1);
 
-      // Calculate tasks by priority
+      // Get tasks created in the last 24 hours
+      const recentTasks = tasks.filter(
+        task => now - new Date(task.created_at).getTime() < 24 * 60 * 60 * 1000
+      );
+
+      // Calculate task distribution by priority
       const tasksByPriority = tasks.reduce((acc, task) => {
         acc[task.priority] = (acc[task.priority] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      // Calculate recent activity (last 24 hours)
-      const now = new Date();
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const recentActivity = {
-        created: tasks.filter(t => new Date(t.created_at) > yesterday).length,
-        completed: completedTasks.filter(t => new Date(t.updated_at) > yesterday).length,
-        updated: tasks.filter(t => new Date(t.updated_at) > yesterday).length,
-      };
+      // Get unique users from messages
+      const uniqueUsers = new Set(messages.map(msg => msg.user_id));
+      const pinnedMessages = messages.filter(msg => msg.is_pinned);
+      const totalLikes = messages.reduce((acc, msg) => acc + msg.likes.length, 0);
 
-      // Calculate chat metrics
-      const chatMetrics = {
-        totalMessages: messages.length,
-        pinnedMessages: messages.filter(m => m.is_pinned).length,
-        totalLikes: messages.reduce((acc, m) => acc + m.likes.length, 0),
-        activeUsers: new Set(messages.map(m => m.user_id)).size,
-      };
-
-      setMetrics({
+      const newMetrics: SystemMetrics = {
         total: tasks.length,
-        completed,
-        inProgress,
-        avgCompletionTime: avgTime / (1000 * 60 * 60), // Convert to hours
+        completed: completedTasks.length,
+        inProgress: inProgressTasks.length,
+        avgCompletionTime: avgTime,
         tasksByPriority,
-        recentActivity,
-        chatMetrics,
-      });
+        recentActivity: {
+          created: recentTasks.length,
+          completed: completedTasks.filter(
+            task => now - new Date(task.updated_at).getTime() < 24 * 60 * 60 * 1000
+          ).length,
+          updated: tasks.filter(
+            task => now - new Date(task.updated_at).getTime() < 24 * 60 * 60 * 1000
+          ).length,
+        },
+        chatMetrics: {
+          totalMessages: messages.length,
+          pinnedMessages: pinnedMessages.length,
+          totalLikes,
+          activeUsers: uniqueUsers.size,
+        },
+      };
 
-      // Add chat-related logs
-      if (messages.length > 0) {
-        const recentMessages = messages
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-          .slice(0, 5);
-
-        addLog('info', 'Recent chat activity', {
-          messages: recentMessages.map(m => ({
-            timestamp: m.timestamp,
-            user_id: m.user_id,
-            likes: m.likes.length,
-            is_pinned: m.is_pinned,
-          })),
-        });
-      }
+      setMetrics(newMetrics);
+      addLog('success', 'Metrics updated successfully');
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to load metrics:', error);
+      addLog('error', 'Failed to load metrics', error);
+      setIsLoading(false);
     }
   }
 
-  function analyzeTaskDistribution(tasks: Task[]) {
-    const distribution = tasks.reduce((acc, task) => {
-      acc[task.status] = (acc[task.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    addLog('info', 'Task distribution analysis', { distribution });
+  function addLog(type: LogEntry['type'], message: string, details?: any) {
+    setLogs(prev => [{
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      details
+    }, ...prev].slice(0, 100)); // Keep last 100 logs
   }
 
-  function addLog(type: LogEntry['type'], message: string, details?: any) {
-    setLogs(prev => [
-      {
-        timestamp: new Date().toISOString(),
-        type,
-        message,
-        details,
-      },
-      ...prev.slice(0, 99), // Keep last 100 logs
-    ]);
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+          <span className="text-lg font-medium">Loading metrics...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="grid h-[calc(100vh-3.5rem)] grid-cols-[1fr_350px] gap-4 bg-black p-4 font-mono text-sm text-green-400">
-      {/* Main Content */}
-      <div className="flex flex-col gap-4 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hover:bg-green-900/20 hover:text-green-400"
-              asChild
-            >
-              <Link to="/" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Board</span>
-              </Link>
-            </Button>
-            <div className="h-4 w-px bg-green-900/50" />
-            <div className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 text-green-600" />
-              <span className="font-bold">System Monitor</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-green-600">
-            <RefreshCcw className="h-3 w-3 animate-spin" />
-            <span>Live Updates</span>
+    <div className="flex h-[calc(100vh-3.5rem)] flex-col gap-4 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="hover:bg-muted"
+            asChild
+          >
+            <Link to="/" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Board</span>
+            </Link>
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <span className="font-bold">Real-time Database Monitor</span>
           </div>
         </div>
-
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-4 gap-4 shrink-0">
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <div className="flex items-center gap-2 text-xs text-green-600">
-              <BarChart3 className="h-4 w-4" />
-              <span>Total Tasks</span>
-            </div>
-            <div className="mt-1 text-2xl">{metrics.total}</div>
-          </div>
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <div className="flex items-center gap-2 text-xs text-green-600">
-              <CheckCircle2 className="h-4 w-4" />
-              <span>Completed</span>
-            </div>
-            <div className="mt-1 text-2xl">{metrics.completed}</div>
-          </div>
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <div className="flex items-center gap-2 text-xs text-green-600">
-              <Activity className="h-4 w-4" />
-              <span>In Progress</span>
-            </div>
-            <div className="mt-1 text-2xl">{metrics.inProgress}</div>
-          </div>
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <div className="flex items-center gap-2 text-xs text-green-600">
-              <Timer className="h-4 w-4" />
-              <span>Avg. Time (hours)</span>
-            </div>
-            <div className="mt-1 text-2xl">
-              {metrics.avgCompletionTime.toFixed(1)}
-            </div>
-          </div>
-        </div>
-
-        {/* Chat Metrics */}
-        <div className="rounded border border-green-900/50 bg-black/50 p-4 shrink-0">
-          <div className="flex items-center gap-2 mb-3">
-            <MessageSquare className="h-4 w-4 text-green-600" />
-            <h3 className="font-bold">Chat System Metrics</h3>
-          </div>
-          <div className="grid grid-cols-4 gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Total Messages</div>
-              <div className="text-xl">{metrics.chatMetrics.totalMessages}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Pinned Messages</div>
-              <div className="text-xl">{metrics.chatMetrics.pinnedMessages}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Total Likes</div>
-              <div className="text-xl">{metrics.chatMetrics.totalLikes}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Active Users</div>
-              <div className="text-xl">{metrics.chatMetrics.activeUsers}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="rounded border border-green-900/50 bg-black/50 p-4 shrink-0">
-          <h3 className="mb-3 font-bold">Last 24 Hours Activity</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">New Tasks</div>
-              <div className="text-xl">{metrics.recentActivity.created}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Completed</div>
-              <div className="text-xl">{metrics.recentActivity.completed}</div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="text-xs text-green-600">Updates</div>
-              <div className="text-xl">{metrics.recentActivity.updated}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Priority Distribution */}
-        <div className="rounded border border-green-900/50 bg-black/50 p-4 shrink-0">
-          <h3 className="mb-3 font-bold">Tasks by Priority</h3>
-          <div className="grid grid-cols-3 gap-4">
-            {Object.entries(metrics.tasksByPriority).map(([priority, count]) => (
-              <div key={priority} className="flex flex-col gap-1">
-                <div className="text-xs text-green-600">{priority}</div>
-                <div className="text-xl">{count}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadMetrics}
+          className="gap-2"
+        >
+          <Clock className="h-4 w-4" />
+          Refresh Metrics
+        </Button>
       </div>
 
-      {/* System Logs */}
-      <div className="flex h-full flex-col gap-4 overflow-hidden">
-        <div className="flex items-center justify-between shrink-0">
-          <h3 className="font-bold">System Logs</h3>
-          <Clock className="h-4 w-4 text-green-600" />
-        </div>
-        <div className="flex-1 min-h-0 rounded border border-green-900/50 bg-black/50">
-          <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-green-900/50 scrollbar-track-transparent">
-            <div className="space-y-2 p-4">
-              {logs.map((log, i) => (
-                <div key={i} className="font-mono text-xs break-words whitespace-pre-wrap">
-                  <span className="text-green-600">
-                    [{new Date(log.timestamp).toLocaleTimeString()}]
-                  </span>{' '}
-                  <span className={cn(
-                    log.type === 'error' && 'text-red-400',
-                    log.type === 'warning' && 'text-yellow-400',
-                    log.type === 'success' && 'text-green-400',
-                    log.type === 'info' && 'text-green-300'
-                  )}>
-                    {log.message}
-                  </span>
-                  {log.details && (
-                    <pre className="mt-1 overflow-x-auto text-green-600 break-words whitespace-pre-wrap">
-                      {JSON.stringify(log.details, null, 2)}
-                    </pre>
-                  )}
+      {/* Main Content */}
+      <div className="grid flex-1 gap-4 overflow-hidden md:grid-cols-2">
+        {/* Left Column - Metrics */}
+        <div className="space-y-4 overflow-auto">
+          {/* Task Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DatabaseIcon className="h-5 w-5 text-primary" />
+                Task Metrics
+              </CardTitle>
+              <CardDescription>Real-time task statistics and distribution</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total Tasks</p>
+                  <p className="text-2xl font-bold">{metrics?.total}</p>
                 </div>
-              ))}
-              <div ref={logsEndRef} />
-            </div>
-          </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Completed</p>
+                  <p className="text-2xl font-bold text-green-500">{metrics?.completed}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">In Progress</p>
+                  <p className="text-2xl font-bold text-blue-500">{metrics?.inProgress}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Priority Distribution</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {Object.entries(metrics?.tasksByPriority || {}).map(([priority, count]) => (
+                    <div
+                      key={priority}
+                      className="flex items-center justify-between rounded-lg border p-2"
+                    >
+                      <span className="text-sm capitalize">{priority}</span>
+                      <span className="font-bold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Chat Metrics */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Chat Metrics
+              </CardTitle>
+              <CardDescription>Real-time chat activity and engagement</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total Messages</p>
+                  <p className="text-2xl font-bold">{metrics?.chatMetrics.totalMessages}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Active Users</p>
+                  <p className="text-2xl font-bold">{metrics?.chatMetrics.activeUsers}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Pinned Messages</p>
+                  <p className="text-2xl font-bold">{metrics?.chatMetrics.pinnedMessages}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total Likes</p>
+                  <p className="text-2xl font-bold">{metrics?.chatMetrics.totalLikes}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart className="h-5 w-5 text-primary" />
+                Recent Activity (24h)
+              </CardTitle>
+              <CardDescription>Task activity in the last 24 hours</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Created</p>
+                <p className="text-2xl font-bold text-blue-500">
+                  {metrics?.recentActivity.created}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {metrics?.recentActivity.completed}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Updated</p>
+                <p className="text-2xl font-bold text-yellow-500">
+                  {metrics?.recentActivity.updated}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Command Input */}
-        <div className="flex items-center gap-2 rounded border border-green-900/50 bg-black/50 p-2 shrink-0">
-          <span className="text-green-600">$</span>
-          <input
-            type="text"
-            className="flex-1 bg-transparent text-green-400 outline-none placeholder:text-green-900"
-            placeholder="Type a command (coming soon...)"
-          />
-        </div>
+        {/* Right Column - System Logs */}
+        <Card className="flex flex-col overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              System Logs
+            </CardTitle>
+            <CardDescription>Real-time database operations and events</CardDescription>
+          </CardHeader>
+          <CardContent className="flex-1 overflow-hidden p-0">
+            <ScrollArea className="h-[calc(100vh-20rem)]">
+              <div className="space-y-2 p-4">
+                {logs.map((log, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start gap-2 rounded-lg border p-2 text-sm"
+                  >
+                    {log.type === 'success' && (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    )}
+                    {log.type === 'error' && (
+                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                    )}
+                    {log.type === 'warning' && (
+                      <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    )}
+                    {log.type === 'info' && (
+                      <Activity className="h-4 w-4 text-blue-500" />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{log.message}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      {log.details && (
+                        <pre className="mt-1 text-xs text-muted-foreground">
+                          {JSON.stringify(log.details, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

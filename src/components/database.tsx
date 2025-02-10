@@ -1,17 +1,30 @@
 import { useEffect, useState } from 'react';
 import { dbService } from '@/lib/db';
 import type { Task, ChatMessage } from '@/lib/types';
-import { ArrowLeft, Database as DatabaseIcon, Table, KeyRound, Calendar, Clock, Tag, User, FileText, AlertTriangle, MessageSquare } from 'lucide-react';
+import { 
+  ArrowLeft, Database as DatabaseIcon, Table, KeyRound, Calendar, 
+  Clock, Tag, User2, FileText, AlertTriangle, MessageSquare, Search, 
+  Filter, LayoutGrid, List, RefreshCcw, ChevronDown, Eye, Code, 
+  BarChart2, Activity, Layers, Shield
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
 interface TableSchema {
   name: string;
+  description: string;
   fields: {
     name: string;
     type: string;
     required: boolean;
+    description: string;
   }[];
 }
 
@@ -31,41 +44,63 @@ export function Database() {
     storageUsed: '0 KB',
     indices: ['status', 'created_at', 'user_id', 'timestamp'],
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeTable, setActiveTable] = useState<string | null>(null);
+  const [showJSON, setShowJSON] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Schema definitions for visualization
+  // Enhanced schema definitions
   const schemas: TableSchema[] = [
     {
       name: 'tasks',
+      description: 'Core task management data including status, priority, and assignments',
       fields: [
-        { name: 'id', type: 'string (UUID)', required: true },
-        { name: 'title', type: 'string', required: true },
-        { name: 'description', type: 'string | null', required: false },
-        { name: 'status', type: 'enum', required: true },
-        { name: 'priority', type: 'enum', required: true },
-        { name: 'ticket_id', type: 'string', required: true },
-        { name: 'created_by', type: 'string', required: true },
-        { name: 'assigned_to', type: 'string | null', required: false },
-        { name: 'created_at', type: 'timestamp', required: true },
-        { name: 'updated_at', type: 'timestamp', required: true },
-        { name: 'due_date', type: 'timestamp', required: false },
-        { name: 'estimated_hours', type: 'number', required: false },
-        { name: 'labels', type: 'string[]', required: true },
+        { name: 'id', type: 'string (UUID)', required: true, description: 'Unique identifier for the task' },
+        { name: 'title', type: 'string', required: true, description: 'Task title' },
+        { name: 'description', type: 'string | null', required: false, description: 'Rich text description with formatting and mentions' },
+        { name: 'status', type: 'enum', required: true, description: 'Task workflow status (backlog → done)' },
+        { name: 'priority', type: 'enum', required: true, description: 'Task importance level' },
+        { name: 'ticket_id', type: 'string', required: true, description: 'Human-readable reference ID' },
+        { name: 'created_by', type: 'string', required: true, description: 'Task creator reference' },
+        { name: 'assigned_to', type: 'string | null', required: false, description: 'Assigned team member' },
+        { name: 'created_at', type: 'timestamp', required: true, description: 'Creation timestamp' },
+        { name: 'updated_at', type: 'timestamp', required: true, description: 'Last modification time' },
+        { name: 'due_date', type: 'timestamp', required: false, description: 'Task deadline' },
+        { name: 'estimated_hours', type: 'number', required: false, description: 'Time estimate' },
+        { name: 'labels', type: 'string[]', required: true, description: 'Categorization tags' },
       ],
     },
     {
       name: 'messages',
+      description: 'Real-time chat system with rich features like mentions, reactions, and threading',
       fields: [
-        { name: 'id', type: 'string (UUID)', required: true },
-        { name: 'content', type: 'string', required: true },
-        { name: 'user_id', type: 'string', required: true },
-        { name: 'timestamp', type: 'timestamp', required: true },
-        { name: 'likes', type: 'string[]', required: true },
-        { name: 'is_pinned', type: 'boolean', required: true },
-        { name: 'reply_to', type: 'string | null', required: false },
-        { name: 'task_id', type: 'string | null', required: false },
-        { name: 'mentions', type: 'string[]', required: false },
+        { name: 'id', type: 'string (UUID)', required: true, description: 'Message identifier' },
+        { name: 'content', type: 'string', required: true, description: 'Message text content' },
+        { name: 'user_id', type: 'string', required: true, description: 'Sender reference' },
+        { name: 'timestamp', type: 'timestamp', required: true, description: 'Send time' },
+        { name: 'likes', type: 'string[]', required: true, description: 'User reactions' },
+        { name: 'is_pinned', type: 'boolean', required: true, description: 'Pinned status' },
+        { name: 'reply_to', type: 'string | null', required: false, description: 'Parent message' },
+        { name: 'task_id', type: 'string | null', required: false, description: 'Related task' },
+        { name: 'mentions', type: 'string[]', required: false, description: '@mentioned users' },
+        { name: 'edited_at', type: 'timestamp', required: false, description: 'Last edit time' },
       ],
     },
+    {
+      name: 'users',
+      description: 'User accounts and authentication data',
+      fields: [
+        { name: 'id', type: 'string (UUID)', required: true, description: 'User identifier' },
+        { name: 'username', type: 'string', required: true, description: 'Display name' },
+        { name: 'email', type: 'string', required: true, description: 'Email address' },
+        { name: 'created_at', type: 'timestamp', required: true, description: 'Account creation' },
+        { name: 'updated_at', type: 'timestamp', required: true, description: 'Profile updates' },
+        { name: 'last_seen', type: 'timestamp', required: false, description: 'Activity tracking' },
+        { name: 'preferences', type: 'json', required: false, description: 'User settings' },
+      ],
+    }
   ];
 
   useEffect(() => {
@@ -74,6 +109,7 @@ export function Database() {
 
   async function loadData() {
     try {
+      setIsLoading(true);
       const [tasks, messages] = await Promise.all([
         dbService.getTasks(),
         dbService.getMessages(),
@@ -110,18 +146,46 @@ export function Database() {
       });
     } catch (error) {
       console.error('Failed to load database data:', error);
+    } finally {
+      setIsLoading(false);
     }
   }
 
+  const filteredSchemas = schemas.filter(schema =>
+    schema.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    schema.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    schema.fields.some(field => 
+      field.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      field.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+          <span className="text-lg font-medium">Loading database...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col gap-4 bg-black p-4 font-mono text-sm text-green-400 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between shrink-0">
+    <div className="flex h-[calc(100vh-3.5rem)] flex-col gap-4 p-4">
+      {/* Enhanced Header */}
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
-            className="hover:bg-green-900/20 hover:text-green-400"
+            className="hover:bg-muted"
             asChild
           >
             <Link to="/" className="flex items-center gap-2">
@@ -129,184 +193,415 @@ export function Database() {
               <span>Back to Board</span>
             </Link>
           </Button>
-          <div className="h-4 w-px bg-green-900/50" />
+          <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-2">
-            <DatabaseIcon className="h-4 w-4 text-green-600" />
+            <DatabaseIcon className="h-4 w-4 text-primary" />
             <span className="font-bold">Database Explorer</span>
           </div>
         </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
+            <Activity className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium">{stats.totalRecords}</span>
+              <span className="text-muted-foreground">records</span>
+              <span className="text-muted-foreground">•</span>
+              <span className="font-medium">{stats.storageUsed}</span>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            {viewMode === 'grid' ? (
+              <LayoutGrid className="h-4 w-4" />
+            ) : (
+              <List className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Enhanced Search */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search tables, fields, and explore data..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Button variant="outline" size="icon">
+          <Filter className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Database Overview Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalRecords}</div>
+            <p className="text-xs text-muted-foreground">
+              Across {schemas.length} tables
+            </p>
+            <Progress 
+              value={70} 
+              className="mt-3"
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Storage Used</CardTitle>
+            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.storageUsed}</div>
+            <p className="text-xs text-muted-foreground">
+              Last updated {new Date(stats.lastUpdated).toLocaleString()}
+            </p>
+            <Progress 
+              value={40} 
+              className="mt-3"
+            />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Indices</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.indices.length}</div>
+            <div className="mt-3 flex flex-wrap gap-1">
+              {stats.indices.map(index => (
+                <Badge 
+                  key={index}
+                  variant="secondary" 
+                  className="text-xs"
+                >
+                  {index}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-[2fr_1fr] gap-4 min-h-0 flex-1 overflow-hidden">
-        {/* Left Column */}
-        <div className="flex flex-col gap-4 overflow-y-auto pr-2">
-          {/* Schema Visualization */}
-          {schemas.map(schema => (
-            <div key={schema.name} className="rounded border border-green-900/50 bg-black/50 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Table className="h-5 w-5 text-green-600" />
-                <h2 className="text-lg font-bold">Schema: {schema.name}</h2>
-              </div>
-              <div className="space-y-2">
-                {schema.fields.map((field) => (
-                  <div
-                    key={field.name}
-                    className="flex items-center gap-4 p-2 rounded border border-green-900/20 hover:border-green-900/40 transition-colors"
-                  >
-                    <div className="w-32 flex items-center gap-2">
-                      {field.name === 'id' && <KeyRound className="h-4 w-4 text-yellow-500" />}
-                      {field.name.includes('date') && <Calendar className="h-4 w-4 text-blue-400" />}
-                      {field.name.includes('time') && <Clock className="h-4 w-4 text-purple-400" />}
-                      {field.name === 'labels' && <Tag className="h-4 w-4 text-pink-400" />}
-                      {(field.name.includes('user') || field.name.includes('by')) && <User className="h-4 w-4 text-orange-400" />}
-                      {field.name === 'description' || field.name === 'content' && <FileText className="h-4 w-4 text-green-400" />}
-                      <span className="font-semibold">{field.name}</span>
-                    </div>
-                    <div className="text-green-600/80 flex-1">{field.type}</div>
-                    {!field.required && (
-                      <div className="flex items-center gap-1 text-yellow-500/80">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span>Optional</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+      <Tabs defaultValue="schema" className="flex-1">
+        <TabsList className="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+          <TabsTrigger value="schema" className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow">
+            <Table className="mr-2 h-4 w-4" />
+            Schema Browser
+          </TabsTrigger>
+          <TabsTrigger value="data" className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow">
+            <Eye className="mr-2 h-4 w-4" />
+            Data Explorer
+          </TabsTrigger>
+          <TabsTrigger value="raw" className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow">
+            <Code className="mr-2 h-4 w-4" />
+            Raw View
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Sample Data */}
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <h2 className="text-lg font-bold mb-4">Sample Records</h2>
-            
-            {/* Tasks */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold mb-2 text-green-600">Tasks</h3>
-              <div className="space-y-2">
-                {tasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    className="p-3 rounded border border-green-900/20 hover:border-green-900/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-900/20 text-green-400">
-                        {task.ticket_id}
-                      </span>
-                      <span className="font-semibold">{task.title}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-green-600/80">
-                      <div className="space-y-1">
-                        <div>Status: <span className="text-green-400">{task.status}</span></div>
-                        <div>Priority: <span className="text-green-400">{task.priority}</span></div>
-                        <div>Created: <span className="text-green-400">{new Date(task.created_at).toLocaleString()}</span></div>
-                      </div>
-                      <div className="space-y-1">
-                        <div>Assigned: <span className="text-green-400">{task.assigned_to || 'Unassigned'}</span></div>
-                        <div>Due: <span className="text-green-400">{task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Not set'}</span></div>
-                        <div>Labels: <span className="text-green-400">{task.labels.join(', ') || 'None'}</span></div>
-                      </div>
-                    </div>
+        <TabsContent value="schema" className="flex-1 overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-25rem)]">
+            <div className={cn(
+              "grid gap-4",
+              viewMode === 'grid' ? 'md:grid-cols-2' : 'grid-cols-1'
+            )}>
+              {filteredSchemas.map(schema => (
+                <Card key={schema.name} className="relative overflow-hidden">
+                  <div className="absolute right-2 top-2 flex items-center gap-2">
+                    <Badge variant="outline" className="font-mono">
+                      {schema.fields.length} fields
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Messages */}
-            <div>
-              <h3 className="text-sm font-semibold mb-2 text-green-600">Messages</h3>
-              <div className="space-y-2">
-                {messages.slice(0, 3).map((message) => (
-                  <div
-                    key={message.id}
-                    className="p-3 rounded border border-green-900/20 hover:border-green-900/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <MessageSquare className="h-4 w-4 text-green-600" />
-                      <span className="font-semibold">Message ID: {message.id.slice(0, 8)}</span>
-                      {message.is_pinned && (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-900/20 text-green-400">
-                          Pinned
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-green-600/80">
-                      <div className="space-y-1">
-                        <div>User ID: <span className="text-green-400">{message.user_id}</span></div>
-                        <div>Timestamp: <span className="text-green-400">{new Date(message.timestamp).toLocaleString()}</span></div>
-                        <div>Likes: <span className="text-green-400">{message.likes.length}</span></div>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Table className="h-5 w-5 text-primary" />
+                      {schema.name}
+                    </CardTitle>
+                    <CardDescription>{schema.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {schema.fields.map((field) => (
+                      <div
+                        key={field.name}
+                        className="flex flex-col gap-1 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {field.name === 'id' && <KeyRound className="h-4 w-4 text-yellow-500" />}
+                            {field.name.includes('date') && <Calendar className="h-4 w-4 text-blue-500" />}
+                            {field.name.includes('time') && <Clock className="h-4 w-4 text-purple-500" />}
+                            {field.name === 'labels' && <Tag className="h-4 w-4 text-pink-500" />}
+                            {(field.name.includes('user') || field.name.includes('by')) && <User2 className="h-4 w-4 text-orange-500" />}
+                            {(field.name === 'description' || field.name === 'content') && <FileText className="h-4 w-4 text-green-500" />}
+                            <span className="font-medium">{field.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {field.type}
+                            </Badge>
+                            {!field.required && (
+                              <Badge variant="secondary" className="gap-1 border-yellow-500/20 bg-yellow-500/10 text-yellow-500">
+                                <AlertTriangle className="h-3 w-3" />
+                                Optional
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{field.description}</p>
                       </div>
-                      <div className="space-y-1">
-                        <div>Content: <span className="text-green-400">{message.content.slice(0, 30)}...</span></div>
-                        {message.mentions && message.mentions.length > 0 && (
-                          <div>Mentions: <span className="text-green-400">{message.mentions.join(', ')}</span></div>
-                        )}
-                        {message.reply_to && (
-                          <div>Reply to: <span className="text-green-400">{message.reply_to}</span></div>
-                        )}
-                      </div>
+                    ))}
+                  </CardContent>
+                  <CardFooter className="justify-between border-t bg-muted/50 px-6 py-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Shield className="h-4 w-4" />
+                      <span>Indexed on primary key</span>
                     </div>
-                  </div>
-                ))}
-              </div>
+                    <Button variant="ghost" size="sm" className="gap-2">
+                      <Eye className="h-4 w-4" />
+                      View Data
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
             </div>
-          </div>
-        </div>
+          </ScrollArea>
+        </TabsContent>
 
-        {/* Right Column */}
-        <div className="space-y-4 overflow-y-auto pr-2">
-          {/* Database Stats */}
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <h2 className="text-lg font-bold mb-4">Database Stats</h2>
+        <TabsContent value="data" className="flex-1 overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-25rem)]">
             <div className="space-y-4">
-              <div className="flex flex-col gap-1">
-                <div className="text-xs text-green-600">Total Records</div>
-                <div className="text-2xl">{stats.totalRecords}</div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="text-xs text-green-600">Last Updated</div>
-                <div>{new Date(stats.lastUpdated).toLocaleString()}</div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="text-xs text-green-600">Storage Used</div>
-                <div>{stats.storageUsed}</div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <div className="text-xs text-green-600">Indices</div>
-                <div className="flex flex-wrap gap-2">
-                  {stats.indices.map((index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 rounded-full bg-green-900/20 text-green-400 text-xs"
-                    >
-                      {index}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+              {/* Tasks Sample */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Table className="h-5 w-5 text-primary" />
+                      Tasks
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono">
+                        {tasks.length} records
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setShowJSON(!showJSON)}>
+                        {showJSON ? 'Table View' : 'JSON View'}
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    Recent task records with their current status and metadata
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {tasks.slice(0, 5).map((task) => (
+                      <div
+                        key={task.id}
+                        className="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+                      >
+                        {showJSON ? (
+                          <pre className="overflow-auto text-xs">
+                            {JSON.stringify(task, null, 2)}
+                          </pre>
+                        ) : (
+                          <>
+                            <div className="mb-2 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono">
+                                  {task.ticket_id}
+                                </Badge>
+                                <span className="font-medium">{task.title}</span>
+                              </div>
+                              <Badge 
+                                variant="secondary"
+                                className={cn(
+                                  task.priority === 'high' && 'border-red-500/20 bg-red-500/10 text-red-500',
+                                  task.priority === 'medium' && 'border-yellow-500/20 bg-yellow-500/10 text-yellow-500',
+                                  task.priority === 'low' && 'border-green-500/20 bg-green-500/10 text-green-500'
+                                )}
+                              >
+                                {task.priority}
+                              </Badge>
+                            </div>
+                            <div className="grid gap-4 text-sm md:grid-cols-2">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Status</span>
+                                  <Badge variant="outline">
+                                    {task.status}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Created</span>
+                                  <span className="font-medium">
+                                    {new Date(task.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Assigned</span>
+                                  <span className="font-medium">
+                                    {task.assigned_to || 'Unassigned'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Labels</span>
+                                  <div className="flex gap-1">
+                                    {task.labels.map((label) => (
+                                      <Badge
+                                        key={label}
+                                        variant="secondary"
+                                        className="text-xs"
+                                      >
+                                        {label}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Performance Metrics */}
-          <div className="rounded border border-green-900/50 bg-black/50 p-4">
-            <h2 className="text-lg font-bold mb-4">Query Performance</h2>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center p-2 rounded bg-green-900/10">
-                <span>Read Operations</span>
-                <span className="text-green-400">~2ms</span>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded bg-green-900/10">
-                <span>Write Operations</span>
-                <span className="text-green-400">~5ms</span>
-              </div>
-              <div className="flex justify-between items-center p-2 rounded bg-green-900/10">
-                <span>Index Lookups</span>
-                <span className="text-green-400">~1ms</span>
-              </div>
+              {/* Messages Sample */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5 text-primary" />
+                      Messages
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="font-mono">
+                        {messages.length} records
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={() => setShowJSON(!showJSON)}>
+                        {showJSON ? 'Table View' : 'JSON View'}
+                      </Button>
+                    </div>
+                  </div>
+                  <CardDescription>
+                    Recent chat messages with their metadata and reactions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {messages.slice(0, 5).map((message) => (
+                      <div
+                        key={message.id}
+                        className="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+                      >
+                        {showJSON ? (
+                          <pre className="overflow-auto text-xs">
+                            {JSON.stringify(message, null, 2)}
+                          </pre>
+                        ) : (
+                          <>
+                            <div className="mb-2 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <User2 className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{message.user_id}</span>
+                                {message.is_pinned && (
+                                  <Badge variant="secondary" className="gap-1">
+                                    <Tag className="h-3 w-3" />
+                                    Pinned
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-sm text-muted-foreground">
+                                {new Date(message.timestamp).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="mb-2 text-sm">{message.content}</p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <span>Likes:</span>
+                                <Badge variant="secondary">
+                                  {message.likes.length}
+                                </Badge>
+                              </div>
+                              {message.mentions && message.mentions.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <span>Mentions:</span>
+                                  <Badge variant="secondary">
+                                    {message.mentions.length}
+                                  </Badge>
+                                </div>
+                              )}
+                              {message.reply_to && (
+                                <div className="flex items-center gap-1">
+                                  <span>Reply to:</span>
+                                  <Badge variant="outline" className="font-mono">
+                                    {message.reply_to.slice(0, 8)}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </div>
-        </div>
-      </div>
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="raw" className="flex-1 overflow-hidden">
+          <ScrollArea className="h-[calc(100vh-25rem)]">
+            <Card>
+              <CardHeader>
+                <CardTitle>Raw Database View</CardTitle>
+                <CardDescription>
+                  View and explore the raw JSON data structure
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="overflow-auto rounded-lg bg-muted p-4 text-xs">
+                  {JSON.stringify(
+                    {
+                      tasks: tasks.slice(0, 3),
+                      messages: messages.slice(0, 3),
+                      stats,
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              </CardContent>
+            </Card>
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 } 

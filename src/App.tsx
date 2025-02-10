@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, Outlet } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Board } from '@/components/kanban/board';
@@ -13,6 +13,7 @@ import { Footer } from '@/components/footer';
 import { Github, Terminal, Database as DatabaseIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -109,33 +110,7 @@ function Layout() {
       </header>
 
       <main className="flex-1">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <Board />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/monitor"
-            element={
-              <ProtectedRoute>
-                <Monitor />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/database"
-            element={
-              <ProtectedRoute>
-                <Database />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Outlet />
       </main>
 
       <Footer />
@@ -146,14 +121,24 @@ function Layout() {
   );
 }
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route path="/*" element={<Layout />}>
+      <Route index element={<ProtectedRoute><Board /></ProtectedRoute>} />
+      <Route path="monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
+      <Route path="database" element={<ProtectedRoute><Database /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>
+  )
+);
+
 export default function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Layout />
-        <Analytics />
-        <SpeedInsights />
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <RouterProvider router={router} />
+      <Analytics />
+      <SpeedInsights />
+      <Toaster />
+    </AuthProvider>
   );
 }

@@ -143,11 +143,18 @@ export function ChatPanel() {
         is_pinned: !message.is_pinned,
       });
 
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m
-        )
+      // Update messages state
+      const updatedMessages = messages.map(m =>
+        m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m
       );
+      setMessages(updatedMessages);
+
+      // Update pinned messages state
+      if (!message.is_pinned) {
+        setPinnedMessages(prev => [...prev, { ...message, is_pinned: true }]);
+      } else {
+        setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      }
 
       toast({
         title: message.is_pinned ? 'Message unpinned' : 'Message pinned',
@@ -190,7 +197,11 @@ export function ChatPanel() {
   const handleDelete = async (messageId: string) => {
     try {
       await dbService.deleteMessage(messageId);
+      
+      // Update both messages and pinned messages states
       setMessages(prev => prev.filter(m => m.id !== messageId));
+      setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
+      
       toast({
         title: 'Message deleted',
         description: 'Message has been removed',
@@ -219,15 +230,25 @@ export function ChatPanel() {
         mentions,
       });
 
+      const updatedMessage = {
+        content: editContent,
+        mentions,
+        edited_at: new Date().toISOString(),
+      };
+
+      // Update both messages and pinned messages states
       setMessages(prev =>
         prev.map(m =>
           m.id === messageId
-            ? {
-                ...m,
-                content: editContent,
-                mentions,
-                edited_at: new Date().toISOString(),
-              }
+            ? { ...m, ...updatedMessage }
+            : m
+        )
+      );
+
+      setPinnedMessages(prev =>
+        prev.map(m =>
+          m.id === messageId
+            ? { ...m, ...updatedMessage }
             : m
         )
       );
@@ -273,25 +294,34 @@ export function ChatPanel() {
             {pinnedMessages.map(msg => (
               <div
                 key={msg.id}
-                className="text-xs rounded bg-background/50 p-2"
+                className="text-xs rounded bg-background/50 p-2 group relative"
               >
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <UserIcon className="h-3 w-3" />
-                  <span className="font-medium">
-                    {msg.messageUser?.username || (msg.user_id === 'system' ? 'System' : 'Unknown User')}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    {format(new Date(msg.timestamp), 'MMM d, h:mm a')}
-                    {msg.edited_at && (
-                      <span
-                        className="ml-1 inline-flex items-center text-[10px]"
-                        title={`Edited ${format(new Date(msg.edited_at), 'MMM d, h:mm a')}`}
-                      >
-                        (edited)
-                      </span>
-                    )}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <UserIcon className="h-3 w-3" />
+                    <span className="font-medium">
+                      {msg.messageUser?.username || (msg.user_id === 'system' ? 'System' : 'Unknown User')}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      {format(new Date(msg.timestamp), 'MMM d, h:mm a')}
+                      {msg.edited_at && (
+                        <span
+                          className="ml-1 inline-flex items-center text-[10px]"
+                          title={`Edited ${format(new Date(msg.edited_at), 'MMM d, h:mm a')}`}
+                        >
+                          (edited)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => togglePin(msg.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
+                    title="Unpin message"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
                 <p className="mt-1">{msg.content}</p>
               </div>
