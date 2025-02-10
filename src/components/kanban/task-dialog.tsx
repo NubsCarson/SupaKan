@@ -60,6 +60,7 @@ interface TaskDialogProps {
   onOpenChange: (open: boolean) => void;
   task?: Task;
   onTaskCreated?: () => void;
+  onTaskUpdated?: () => void;
 }
 
 export function TaskDialog({
@@ -67,6 +68,7 @@ export function TaskDialog({
   onOpenChange,
   task,
   onTaskCreated,
+  onTaskUpdated,
 }: TaskDialogProps) {
   const { toast } = useToast();
   const form = useForm<z.infer<typeof formSchema>>({
@@ -111,19 +113,30 @@ export function TaskDialog({
         estimated_hours: task.estimated_hours || 0,
         labels: task.labels || [],
       });
+    } else {
+      form.reset({
+        title: '',
+        description: '',
+        priority: 'medium',
+        status: 'todo',
+        due_date: undefined,
+        estimated_hours: 0,
+        labels: [],
+      });
     }
   }, [task, form]);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       if (task) {
-        dbService.updateTask(task.id, {
+        await dbService.updateTask(task.id, {
           ...values,
           due_date: values.due_date?.toISOString(),
           description: values.description || null,
         });
+        onTaskUpdated?.();
       } else {
-        dbService.createTask({
+        await dbService.createTask({
           ...values,
           due_date: values.due_date?.toISOString(),
           created_by: 'demo-user',
@@ -131,15 +144,13 @@ export function TaskDialog({
           ticket_id: dbService.generateTicketId(),
           description: values.description || null,
         });
+        onTaskCreated?.();
       }
-
       toast({
         title: task ? 'Task updated' : 'Task created',
         description: 'Your changes have been saved.',
       });
-
       onOpenChange(false);
-      if (onTaskCreated) onTaskCreated();
     } catch (error) {
       toast({
         title: 'Error',

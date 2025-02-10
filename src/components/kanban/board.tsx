@@ -18,17 +18,33 @@ const columns = [
 export function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadTasks();
+    const initializeDb = async () => {
+      try {
+        await dbService.initialize();
+        await loadTasks();
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeDb();
   }, []);
 
-  function loadTasks() {
-    const tasks = dbService.getTasks();
-    setTasks(tasks);
+  async function loadTasks() {
+    try {
+      const tasks = await dbService.getTasks();
+      setTasks(tasks);
+    } catch (error) {
+      console.error('Failed to load tasks:', error);
+    }
   }
 
-  function onDragEnd(result: DropResult) {
+  async function onDragEnd(result: DropResult) {
     const { destination, source, draggableId } = result;
 
     if (!destination) return;
@@ -51,7 +67,16 @@ export function Board() {
     });
 
     setTasks(newTasks);
-    dbService.updateTask(task.id, { status: destination.droppableId as Task['status'] });
+    try {
+      await dbService.updateTask(task.id, { status: destination.droppableId as Task['status'] });
+    } catch (error) {
+      console.error('Failed to update task:', error);
+      await loadTasks(); // Reload tasks if update fails
+    }
+  }
+
+  if (isLoading) {
+    return <div className="flex h-full items-center justify-center">Loading...</div>;
   }
 
   return (
