@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kanban Board OG Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1200px;
+      height: 630px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .container {
+      display: flex;
+      gap: 4rem;
+      padding: 4rem;
+      align-items: center;
+    }
+    .content {
+      flex: 1;
+    }
+    .logo {
+      font-size: 4rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #646cff 0%, #9c9eff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1.5rem;
+    }
+    .title {
+      font-size: 3.5rem;
+      font-weight: bold;
+      margin: 0;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+    }
+    .description {
+      font-size: 1.5rem;
+      color: #888;
+      max-width: 600px;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .features {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .feature {
+      background: rgba(100, 108, 255, 0.1);
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      color: #646cff;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+    .preview {
+      width: 400px;
+      height: 400px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 1rem;
+      display: flex;
+      flex-direction: column;
+      padding: 1rem;
+      gap: 1rem;
+    }
+    .column {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="content">
+      <div class="logo">Kanban</div>
+      <h1 class="title">Modern Task<br />Management</h1>
+      <p class="description">Streamline your workflow with real-time collaboration, powerful analytics, and intuitive design.</p>
+      <div class="features">
+        <div class="feature">Task Management</div>
+        <div class="feature">Real-time Chat</div>
+        <div class="feature">Analytics</div>
+      </div>
+    </div>
+    <div class="preview">
+      <div class="column"></div>
+      <div class="column"></div>
+      <div class="column"></div>
+    </div>
+  </div>
+</body>
+</html> 
