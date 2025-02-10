@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { User, Task, ChatMessage } from './types';
 
 const DB_NAME = 'kanban_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORES = {
   USERS: 'users',
@@ -52,24 +52,32 @@ class DbService {
         request.onupgradeneeded = (event) => {
           const db = (event.target as IDBOpenDBRequest).result;
           
-          // Create users store if it doesn't exist
-          if (!db.objectStoreNames.contains(STORES.USERS)) {
-            const userStore = db.createObjectStore(STORES.USERS, { keyPath: 'id' });
-            userStore.createIndex('email', 'email', { unique: true });
+          // Delete existing stores if they exist
+          if (db.objectStoreNames.contains(STORES.USERS)) {
+            db.deleteObjectStore(STORES.USERS);
           }
+          if (db.objectStoreNames.contains(STORES.TASKS)) {
+            db.deleteObjectStore(STORES.TASKS);
+          }
+          if (db.objectStoreNames.contains(STORES.MESSAGES)) {
+            db.deleteObjectStore(STORES.MESSAGES);
+          }
+          
+          // Create users store
+          const userStore = db.createObjectStore(STORES.USERS, { keyPath: 'id' });
+          userStore.createIndex('email', 'email', { unique: true });
+          userStore.createIndex('username', 'username', { unique: true });
 
-          // Create tasks store if it doesn't exist
-          if (!db.objectStoreNames.contains(STORES.TASKS)) {
-            const taskStore = db.createObjectStore(STORES.TASKS, { keyPath: 'id' });
-            taskStore.createIndex('status', 'status', { unique: false });
-            taskStore.createIndex('created_at', 'created_at', { unique: false });
-          }
+          // Create tasks store
+          const taskStore = db.createObjectStore(STORES.TASKS, { keyPath: 'id' });
+          taskStore.createIndex('status', 'status', { unique: false });
+          taskStore.createIndex('created_at', 'created_at', { unique: false });
+          taskStore.createIndex('created_by', 'created_by', { unique: false });
 
-          // Create messages store if it doesn't exist
-          if (!db.objectStoreNames.contains(STORES.MESSAGES)) {
-            const messageStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
-            messageStore.createIndex('timestamp', 'timestamp', { unique: false });
-          }
+          // Create messages store
+          const messageStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
+          messageStore.createIndex('timestamp', 'timestamp', { unique: false });
+          messageStore.createIndex('user_id', 'user_id', { unique: false });
         };
 
         request.onsuccess = async () => {
