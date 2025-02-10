@@ -56,19 +56,49 @@ export function Board() {
       return;
     }
 
+    // Find the task being dragged
     const task = tasks.find(t => t.id === draggableId);
     if (!task) return;
 
-    const newTasks = Array.from(tasks);
-    newTasks.splice(source.index, 1);
-    newTasks.splice(destination.index, 0, {
-      ...task,
-      status: destination.droppableId as Task['status'],
+    // Create arrays of tasks for the source and destination columns
+    const sourceColumnTasks = tasks.filter(t => t.status === source.droppableId);
+    const destColumnTasks = tasks.filter(t => t.status === destination.droppableId);
+
+    // Remove from source column
+    sourceColumnTasks.splice(source.index, 1);
+
+    // Add to destination column
+    if (source.droppableId === destination.droppableId) {
+      sourceColumnTasks.splice(destination.index, 0, {
+        ...task,
+        status: destination.droppableId as Task['status'],
+      });
+    } else {
+      destColumnTasks.splice(destination.index, 0, {
+        ...task,
+        status: destination.droppableId as Task['status'],
+      });
+    }
+
+    // Combine all tasks
+    const newTasks = tasks.map(t => {
+      if (t.status === source.droppableId) {
+        return sourceColumnTasks[tasks.filter(task => task.status === source.droppableId).indexOf(t)] || t;
+      }
+      if (t.status === destination.droppableId) {
+        return destColumnTasks[tasks.filter(task => task.status === destination.droppableId).indexOf(t)] || t;
+      }
+      return t;
     });
 
+    // Update state optimistically
     setTasks(newTasks);
+
     try {
-      await dbService.updateTask(task.id, { status: destination.droppableId as Task['status'] });
+      // Persist the change
+      await dbService.updateTask(task.id, {
+        status: destination.droppableId as Task['status'],
+      });
     } catch (error) {
       console.error('Failed to update task:', error);
       await loadTasks(); // Reload tasks if update fails
@@ -76,11 +106,15 @@ export function Board() {
   }
 
   if (isLoading) {
-    return <div className="flex h-full items-center justify-center">Loading...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-lg font-medium">Loading...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="h-full p-4">
+    <div className="flex h-screen flex-col overflow-hidden bg-background p-4">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Kanban Board</h1>
         <Button onClick={() => setDialogOpen(true)}>
@@ -90,27 +124,38 @@ export function Board() {
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-          {columns.map(({ id, title }) => (
-            <div key={id} className="flex flex-col rounded-lg bg-muted/50 p-2">
-              <h2 className="mb-2 px-2 font-semibold">{title}</h2>
-              <Droppable droppableId={id}>
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="flex-1"
-                  >
-                    <Column
-                      tasks={tasks.filter((task) => task.status === id)}
-                      onTaskUpdated={loadTasks}
-                    />
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          ))}
+        <div className="flex flex-1 gap-4 overflow-x-auto pb-4">
+          {columns.map(({ id, title }) => {
+            const columnTasks = tasks.filter(task => task.status === id);
+            return (
+              <div
+                key={id}
+                className="flex h-full w-80 flex-shrink-0 flex-col rounded-lg bg-muted/50"
+              >
+                <div className="p-2">
+                  <h2 className="px-2 font-semibold">{title}</h2>
+                  <div className="mt-1 h-1 w-full rounded-full bg-gradient-to-r from-primary/20 to-primary/5" />
+                </div>
+                <Droppable droppableId={id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`flex-1 overflow-y-auto p-2 ${
+                        snapshot.isDraggingOver ? 'bg-muted/80' : ''
+                      }`}
+                    >
+                      <Column
+                        tasks={columnTasks}
+                        onTaskUpdated={loadTasks}
+                      />
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
         </div>
       </DragDropContext>
 

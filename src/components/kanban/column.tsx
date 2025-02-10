@@ -1,6 +1,5 @@
-import { Draggable } from 'react-beautiful-dnd';
 import { TaskCard } from './task-card';
-import type { Task } from '@/lib/storage';
+import type { Task } from '@/lib/types';
 
 interface ColumnProps {
   tasks: Task[];
@@ -9,20 +8,22 @@ interface ColumnProps {
 
 export function Column({ tasks, onTaskUpdated }: ColumnProps) {
   return (
-    <div className="space-y-2">
+    <div className="min-h-[50px] space-y-3">
       {tasks.map((task, index) => (
-        <Draggable key={task.id} draggableId={task.id} index={index}>
-          {(provided) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
-              {...provided.dragHandleProps}
-            >
-              <TaskCard task={task} onTaskUpdated={onTaskUpdated} />
-            </div>
-          )}
-        </Draggable>
+        <TaskCard
+          key={task.id}
+          task={task}
+          index={index}
+          onTaskUpdated={onTaskUpdated}
+        />
       ))}
+      {tasks.length === 0 && (
+        <div className="rounded-lg border border-dashed border-muted-foreground/25 p-4">
+          <p className="text-center text-sm text-muted-foreground">
+            Drop tasks here
+          </p>
+        </div>
+      )}
     </div>
   );
 }

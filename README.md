@@ -1,32 +1,33 @@
-# Kanban Board Application
+# Kanban Board
 
-A modern Kanban board application built with React, TypeScript, and Supabase, featuring a rich task management system.
+A modern Kanban board application built with React, TypeScript, and IndexedDB, featuring a rich task management system.
 
 ## Features
 
-- 📋 Drag-and-drop task management
+- 📋 Drag-and-drop task management across columns
 - 📝 Rich text editor for task descriptions
-- 🏷️ Task labels and categorization
+- 🏷️ Task labels and priority levels
 - 📅 Due dates and time estimation
-- 📎 File attachments support
-- 👥 User mentions in comments
-- 🔄 Advanced workflow states
+- 🎯 Task status tracking (Backlog, Todo, In Progress, In Review, Done)
 - 🎨 Modern UI with Tailwind CSS and shadcn/ui
+- 💾 Persistent storage using IndexedDB
+- 🎫 Automatic ticket ID generation
 
 ## Tech Stack
 
 - React + TypeScript
-- Supabase (Backend & Authentication)
+- IndexedDB (Local Storage)
 - TipTap (Rich Text Editor)
 - Tailwind CSS
 - shadcn/ui Components
+- react-beautiful-dnd (Drag and Drop)
 - Vite (Build Tool)
 
 ## Getting Started
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/NubsCarson/kanban.git
+   git clone https://github.com/YourUsername/kanban.git
    cd kanban
    ```
 
@@ -35,35 +36,39 @@ A modern Kanban board application built with React, TypeScript, and Supabase, fe
    npm install
    ```
 
-3. Create a `.env` file in the root directory with your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. Start the development server:
+3. Start the development server:
    ```bash
    npm run dev
    ```
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser.
+4. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-## Database Setup
+## Usage
 
-1. Create a new Supabase project
-2. Run the migration files in the `supabase/migrations` directory
-3. Set up Row Level Security (RLS) policies as defined in the migrations
+### Task Management
+- Create new tasks using the "New Task" button
+- Edit tasks by clicking the pencil icon on any task card
+- Drag and drop tasks between columns to update their status
+- Set priority levels (Low, Medium, High)
+- Add labels for better organization
+- Set due dates and time estimates
 
-## Environment Variables
+### Data Persistence
+- All data is stored locally in your browser using IndexedDB
+- Data persists between page refreshes and browser restarts
+- No backend setup required
 
-Create a `.env` file with the following variables:
+## Development
 
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+- Build the project:
+  ```bash
+  npm run build
+  ```
 
-⚠️ Never commit the `.env` file or expose these credentials.
+- Preview the production build:
+  ```bash
+  npm run preview
+  ```
 
 ## Contributing
 
@@ -80,4 +85,4 @@ MIT License - feel free to use this project for your own purposes.
 
 - [shadcn/ui](https://ui.shadcn.com/) for the beautiful UI components
 - [TipTap](https://tiptap.dev/) for the rich text editor
-- [Supabase](https://supabase.io/) for the backend infrastructure 
+- [react-beautiful-dnd](https://github.com/atlassian/react-beautiful-dnd) for drag and drop functionality 
