@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Calendar, Link, MoreVertical } from 'lucide-react';
 import { format } from 'date-fns';
-
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -10,95 +8,83 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
+  CardTitle,
 } from '@/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { TaskDialog } from './task-dialog';
-import type { Database } from '@/types/supabase';
-
-type Task = Database['public']['Tables']['tasks']['Row'];
-
-const priorityColors = {
-  low: 'bg-blue-500',
-  medium: 'bg-yellow-500',
-  high: 'bg-red-500',
-};
+import type { Task } from '@/lib/types';
 
 interface TaskCardProps {
   task: Task;
+  onTaskUpdated: () => void;
 }
 
-export function TaskCard({ task }: TaskCardProps) {
-  const [isEditOpen, setIsEditOpen] = useState(false);
+export function TaskCard({ task, onTaskUpdated }: TaskCardProps) {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const priorityColors = {
+    low: 'bg-green-500/10 text-green-700',
+    medium: 'bg-yellow-500/10 text-yellow-700',
+    high: 'bg-red-500/10 text-red-700',
+  };
 
   return (
     <>
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-          <div className="space-y-1">
-            <p className="text-sm font-medium leading-none">{task.title}</p>
-            {task.ticket_id && (
-              <div className="flex items-center space-x-1">
-                <Link className="h-3 w-3" />
-                <span className="text-xs text-muted-foreground">
-                  {task.ticket_id}
-                </span>
-              </div>
-            )}
+      <Card className="group relative">
+        <CardHeader className="p-4">
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="text-base font-medium leading-none">
+              {task.title}
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="opacity-0 group-hover:opacity-100"
+              onClick={() => setIsEditing(true)}
+            >
+              Edit
+            </Button>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
-                Edit
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="mt-1 flex flex-wrap gap-1">
+            <Badge variant="secondary" className={priorityColors[task.priority]}>
+              {task.priority}
+            </Badge>
+            {task.labels?.map((label) => (
+              <Badge key={label} variant="outline">
+                {label}
+              </Badge>
+            ))}
+          </div>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {task.description || 'No description'}
-          </p>
+        <CardContent className="px-4 pb-2">
+          <div
+            className="prose prose-sm max-w-none text-muted-foreground"
+            dangerouslySetInnerHTML={{ __html: task.description || '' }}
+          />
         </CardContent>
-        <CardFooter className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-6 w-6">
-              <AvatarImage
-                src={task.profiles?.avatar_url || undefined}
-                alt={task.profiles?.username || 'User'}
-              />
-              <AvatarFallback>
-                {task.profiles?.username?.[0].toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex items-center space-x-1">
-              <Calendar className="h-3 w-3" />
-              <span className="text-xs text-muted-foreground">
-                {format(new Date(task.created_at), 'MMM d')}
-              </span>
+        <CardFooter className="flex items-center gap-4 px-4 pb-4 text-sm text-muted-foreground">
+          {task.due_date && (
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4" />
+              <span>{format(new Date(task.due_date), 'MMM d')}</span>
             </div>
+          )}
+          {task.estimated_hours && (
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>{task.estimated_hours}h</span>
+            </div>
+          )}
+          <div className="ml-auto text-xs">
+            {task.ticket_id}
           </div>
-          <Badge
-            variant="secondary"
-            className={`${priorityColors[task.priority]} text-white`}
-          >
-            {task.priority}
-          </Badge>
         </CardFooter>
       </Card>
 
       <TaskDialog
-        open={isEditOpen}
-        onOpenChange={setIsEditOpen}
+        open={isEditing}
+        onOpenChange={setIsEditing}
         task={task}
+        onTaskCreated={onTaskUpdated}
       />
     </>
   );

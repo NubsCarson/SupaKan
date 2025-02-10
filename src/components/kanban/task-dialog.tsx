@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { CalendarIcon, Clock, Tags } from 'lucide-react';
+import { CalendarIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
@@ -28,10 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
+import { dbService } from '@/lib/db';
+import type { Task } from '@/lib/types';
 import { Calendar } from '@/components/ui/calendar';
 import {
   Popover,
@@ -39,7 +38,6 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Editor } from '@/components/ui/editor';
 
 // Rich text editor component using TipTap
@@ -47,15 +45,11 @@ import { useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 
-type Task = Database['public']['Tables']['tasks']['Row'];
-
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high']),
   status: z.enum(['backlog', 'todo', 'in_progress', 'in_review', 'done']),
-  ticket_id: z.string().optional(),
-  assigned_to: z.string().optional(),
   due_date: z.date().optional(),
   estimated_hours: z.number().min(0).optional(),
   labels: z.array(z.string()).default([]),
@@ -82,8 +76,6 @@ export function TaskDialog({
       description: task?.description || '',
       priority: task?.priority || 'medium',
       status: task?.status || 'todo',
-      ticket_id: task?.ticket_id || '',
-      assigned_to: task?.assigned_to || '',
       due_date: task?.due_date ? new Date(task.due_date) : undefined,
       estimated_hours: task?.estimated_hours || 0,
       labels: task?.labels || [],
@@ -115,8 +107,6 @@ export function TaskDialog({
         description: task.description || '',
         priority: task.priority,
         status: task.status,
-        ticket_id: task.ticket_id || '',
-        assigned_to: task.assigned_to || '',
         due_date: task.due_date ? new Date(task.due_date) : undefined,
         estimated_hours: task.estimated_hours || 0,
         labels: task.labels || [],
@@ -124,29 +114,23 @@ export function TaskDialog({
     }
   }, [task, form]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const ticketId = values.ticket_id || generateTicketId();
-      
       if (task) {
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            ...values,
-            ticket_id: ticketId,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', task.id);
-        if (error) throw error;
+        dbService.updateTask(task.id, {
+          ...values,
+          due_date: values.due_date?.toISOString(),
+          description: values.description || null,
+        });
       } else {
-        const { error } = await supabase.from('tasks').insert([
-          {
-            ...values,
-            ticket_id: ticketId,
-            status: 'todo',
-          },
-        ]);
-        if (error) throw error;
+        dbService.createTask({
+          ...values,
+          due_date: values.due_date?.toISOString(),
+          created_by: 'demo-user',
+          assigned_to: null,
+          ticket_id: dbService.generateTicketId(),
+          description: values.description || null,
+        });
       }
 
       toast({
@@ -163,13 +147,6 @@ export function TaskDialog({
         variant: 'destructive',
       });
     }
-  }
-
-  function generateTicketId() {
-    const prefix = 'TASK';
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substring(2, 6);
-    return `${prefix}-${timestamp}-${random}`.toUpperCase();
   }
 
   return (

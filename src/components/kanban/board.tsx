@@ -1,146 +1,99 @@
 import { useEffect, useState } from 'react';
-import { DragDropContext, Droppable } from 'react-beautiful-dnd';
-import { Plus, LogOut } from 'lucide-react';
-
+import { DragDropContext, Droppable, DropResult } from 'react-beautiful-dnd';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { KanbanColumn } from './column';
 import { TaskDialog } from './task-dialog';
-import { supabase } from '@/lib/supabase';
-import type { Database } from '@/types/supabase';
+import { Column } from './column';
+import { dbService } from '@/lib/db';
+import type { Task } from '@/lib/types';
 
-type Task = Database['public']['Tables']['tasks']['Row'];
+const columns = [
+  { id: 'backlog', title: 'Backlog' },
+  { id: 'todo', title: 'To Do' },
+  { id: 'in_progress', title: 'In Progress' },
+  { id: 'in_review', title: 'In Review' },
+  { id: 'done', title: 'Done' },
+] as const;
 
-export function KanbanBoard() {
+export function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    fetchTasks();
-    const subscription = supabase
-      .channel('tasks')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        () => fetchTasks()
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    loadTasks();
   }, []);
 
-  async function fetchTasks() {
-    try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*, profiles!tasks_assigned_to_fkey(username, avatar_url)')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTasks(data || []);
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  function loadTasks() {
+    const tasks = dbService.getTasks();
+    setTasks(tasks);
   }
 
-  const onDragEnd = async (result: any) => {
-    if (!result.destination) return;
+  function onDragEnd(result: DropResult) {
+    const { destination, source, draggableId } = result;
 
-    const { source, destination, draggableId } = result;
-    if (source.droppableId === destination.droppableId) return;
+    if (!destination) return;
 
-    const newStatus = destination.droppableId as Task['status'];
-    
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: newStatus })
-        .eq('id', draggableId);
-
-      if (error) throw error;
-
-      setTasks(tasks.map(task => 
-        task.id === draggableId ? { ...task, status: newStatus } : task
-      ));
-    } catch (error) {
-      console.error('Error updating task status:', error);
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
     }
-  };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
+    const task = tasks.find(t => t.id === draggableId);
+    if (!task) return;
+
+    const newTasks = Array.from(tasks);
+    newTasks.splice(source.index, 1);
+    newTasks.splice(destination.index, 0, {
+      ...task,
+      status: destination.droppableId as Task['status'],
+    });
+
+    setTasks(newTasks);
+    dbService.updateTask(task.id, { status: destination.droppableId as Task['status'] });
+  }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="mx-auto max-w-[1600px]">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Kanban Board</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage your tasks and track progress
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button onClick={() => setIsNewTaskOpen(true)} size="sm">
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
-        
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Droppable droppableId="todo">
-              {(provided) => (
-                <KanbanColumn
-                  title="To Do"
-                  description="Tasks to be started"
-                  tasks={tasks.filter((task) => task.status === 'todo')}
-                  provided={provided}
-                  isLoading={isLoading}
-                />
-              )}
-            </Droppable>
-            <Droppable droppableId="doing">
-              {(provided) => (
-                <KanbanColumn
-                  title="In Progress"
-                  description="Tasks currently being worked on"
-                  tasks={tasks.filter((task) => task.status === 'doing')}
-                  provided={provided}
-                  isLoading={isLoading}
-                />
-              )}
-            </Droppable>
-            <Droppable droppableId="done">
-              {(provided) => (
-                <KanbanColumn
-                  title="Done"
-                  description="Completed tasks"
-                  tasks={tasks.filter((task) => task.status === 'done')}
-                  provided={provided}
-                  isLoading={isLoading}
-                />
-              )}
-            </Droppable>
-          </div>
-        </DragDropContext>
-
-        <TaskDialog
-          open={isNewTaskOpen}
-          onOpenChange={setIsNewTaskOpen}
-          onTaskCreated={fetchTasks}
-        />
+    <div className="h-full p-4">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Kanban Board</h1>
+        <Button onClick={() => setDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Task
+        </Button>
       </div>
+
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
+          {columns.map(({ id, title }) => (
+            <div key={id} className="flex flex-col rounded-lg bg-muted/50 p-2">
+              <h2 className="mb-2 px-2 font-semibold">{title}</h2>
+              <Droppable droppableId={id}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="flex-1"
+                  >
+                    <Column
+                      tasks={tasks.filter((task) => task.status === id)}
+                      onTaskUpdated={loadTasks}
+                    />
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </div>
+          ))}
+        </div>
+      </DragDropContext>
+
+      <TaskDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onTaskCreated={loadTasks}
+      />
     </div>
   );
 }
