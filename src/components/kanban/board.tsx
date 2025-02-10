@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { DragDropContext, Droppable, DropResult } from 'react-beautiful-dnd';
-import { Plus } from 'lucide-react';
+import { Plus, MessageSquare, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TaskDialog } from './task-dialog';
 import { Column } from './column';
@@ -8,6 +8,8 @@ import { dbService } from '@/lib/db';
 import type { Task } from '@/lib/types';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { Badge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 
 const columns = [
   { id: 'backlog', title: 'Backlog', icon: '📋' },
@@ -23,6 +25,7 @@ export function Board() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -70,47 +73,122 @@ export function Board() {
       const taskToMove = tasks.find(t => t.id === draggableId);
       if (!taskToMove) return;
 
-      // Create new arrays for source and destination columns
-      const sourceColumnTasks = tasks.filter(t => t.status === source.droppableId);
-      const destColumnTasks = tasks.filter(t => 
-        t.status === destination.droppableId && t.id !== draggableId
+      // Get tasks in source and destination columns
+      const sourceColumnTasks = tasks
+        .filter(t => t.status === source.droppableId)
+        .sort((a, b) => a.position - b.position);
+      
+      const destColumnTasks = tasks
+        .filter(t => t.status === destination.droppableId && t.id !== draggableId)
+        .sort((a, b) => a.position - b.position);
+
+      // Calculate new positions
+      const positionStep = 65536; // Large step to allow for future insertions
+      let updatedTasks = [...tasks];
+
+      // Same column reordering
+      if (source.droppableId === destination.droppableId) {
+        const columnTasks = sourceColumnTasks.filter(t => t.id !== draggableId);
+        const newPositions = new Array(columnTasks.length + 1).fill(0)
+          .map((_, index) => index * positionStep);
+        
+        // Insert task at new position
+        columnTasks.splice(destination.index, 0, taskToMove);
+        
+        // Update positions for all tasks in the column
+        updatedTasks = tasks.map(task => {
+          if (task.status === source.droppableId) {
+            const index = columnTasks.findIndex(t => t.id === task.id);
+            if (index !== -1) {
+              return {
+                ...task,
+                position: newPositions[index]
+              };
+            }
+          }
+          return task;
+        });
+      } 
+      // Moving between columns
+      else {
+        // Remove from source column
+        const newSourceTasks = sourceColumnTasks.filter(t => t.id !== draggableId);
+        const sourcePositions = new Array(newSourceTasks.length).fill(0)
+          .map((_, index) => index * positionStep);
+
+        // Insert into destination column
+        const newDestTasks = [...destColumnTasks];
+        newDestTasks.splice(destination.index, 0, taskToMove);
+        const destPositions = new Array(newDestTasks.length).fill(0)
+          .map((_, index) => index * positionStep);
+
+        // Update all affected tasks
+        updatedTasks = tasks.map(task => {
+          // Update moved task
+          if (task.id === draggableId) {
+            return {
+              ...task,
+              status: destination.droppableId as Task['status'],
+              position: destPositions[destination.index]
+            };
+          }
+          // Update source column tasks
+          if (task.status === source.droppableId) {
+            const index = newSourceTasks.findIndex(t => t.id === task.id);
+            if (index !== -1) {
+              return {
+                ...task,
+                position: sourcePositions[index]
+              };
+            }
+          }
+          // Update destination column tasks
+          if (task.status === destination.droppableId) {
+            const index = newDestTasks.findIndex(t => t.id === task.id);
+            if (index !== -1) {
+              return {
+                ...task,
+                position: destPositions[index]
+              };
+            }
+          }
+          return task;
+        });
+      }
+
+      // Update state immediately for smooth animation
+      setTasks(updatedTasks);
+
+      // Persist all position changes
+      await Promise.all(
+        updatedTasks
+          .filter(t => 
+            t.id === draggableId || 
+            t.status === source.droppableId || 
+            t.status === destination.droppableId
+          )
+          .map(task => 
+            dbService.updateTask(task.id, {
+              status: task.status,
+              position: task.position
+            })
+          )
       );
 
-      // Remove from source
-      sourceColumnTasks.splice(source.index, 1);
-
-      // Add to destination
-      const updatedTask = {
-        ...taskToMove,
-        status: destination.droppableId as Task['status']
-      };
-      destColumnTasks.splice(destination.index, 0, updatedTask);
-
-      // Combine all tasks
-      const newTasks = tasks.map(task => {
-        if (task.id === draggableId) {
-          return updatedTask;
-        }
-        if (task.status === source.droppableId) {
-          const index = sourceColumnTasks.findIndex(t => t.id === task.id);
-          return index !== -1 ? sourceColumnTasks[index] : task;
-        }
-        if (task.status === destination.droppableId) {
-          const index = destColumnTasks.findIndex(t => t.id === task.id);
-          return index !== -1 ? destColumnTasks[index] : task;
-        }
-        return task;
-      });
-
-      // Update state immediately
-      setTasks(newTasks);
-
-      // Persist the change
-      await dbService.updateTask(draggableId, {
-        status: destination.droppableId as Task['status']
+      // Show success toast
+      toast({
+        title: 'Task updated',
+        description: source.droppableId === destination.droppableId
+          ? 'Task reordered successfully'
+          : `Task moved to ${columns.find(c => c.id === destination.droppableId)?.title}`,
       });
     } catch (error) {
       console.error('Failed to update task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update task position',
+        variant: 'destructive',
+      });
       // Revert to original state if update fails
       await loadTasks();
     }
@@ -137,34 +215,41 @@ export function Board() {
   const doneTasks = tasks.filter(task => task.status === 'done');
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
-      <div className="flex items-center justify-between px-4 py-2">
+    <div className="flex flex-col h-[calc(100vh-7.5rem)]">
+      <div className="flex flex-col gap-4 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Project Board</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Project Board</h1>
           <div className="text-sm text-muted-foreground">
             {completedTasks} of {totalTasks} tasks completed ({completionRate}%)
           </div>
         </div>
-        <Button onClick={() => {
-          setSelectedTask(null);
-          setIsTaskDialogOpen(true);
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Task
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => {
+              setSelectedTask(null);
+              setIsTaskDialogOpen(true);
+            }}
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Task
+          </Button>
+        </div>
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-x-auto p-4">
+      <div className="relative flex flex-1 gap-4 overflow-x-auto p-4">
         <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="flex flex-1 gap-4">
             {columns.map(({ id, title, icon }) => {
-              const columnTasks = tasks.filter(task => task.status === id);
+              const columnTasks = tasks
+                .filter(task => task.status === id)
+                .sort((a, b) => a.position - b.position);
               const columnCompletion = Math.round((columnTasks.length / Math.max(totalTasks, 1)) * 100);
               
               return (
                 <div
                   key={id}
-                  className="flex h-full w-[350px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm dark:bg-card/80"
+                  className="flex h-full w-[280px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm dark:bg-card/80 sm:w-[300px] md:w-[350px]"
                 >
                   <div className="p-3">
                     <div className="flex items-center justify-between">
@@ -172,8 +257,10 @@ export function Board() {
                         <span role="img" aria-label={title}>{icon}</span>
                         <h2 className="font-semibold text-foreground">{title}</h2>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {columnTasks.length}
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm text-muted-foreground">
+                          {columnTasks.length}
+                        </div>
                       </div>
                     </div>
                     <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -188,9 +275,16 @@ export function Board() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`flex-1 overflow-y-auto p-2 transition-colors ${
-                          snapshot.isDraggingOver ? 'bg-muted/50' : ''
-                        }`}
+                        className={cn(
+                          "flex-1 overflow-y-auto p-2 transition-colors duration-200",
+                          "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted",
+                          "hover:scrollbar-thumb-muted-foreground/50",
+                          snapshot.isDraggingOver && "bg-muted/50 ring-2 ring-primary/20"
+                        )}
+                        style={{
+                          minHeight: "100px",
+                          maxHeight: "calc(100vh - 12rem)"
+                        }}
                       >
                         <Column
                           tasks={columnTasks}
@@ -210,20 +304,55 @@ export function Board() {
           </div>
         </DragDropContext>
 
-        {/* Chat Panel */}
-        <div className="w-[400px]">
+        {/* Desktop Chat Panel */}
+        <div className="hidden w-[350px] xl:block">
           <ChatPanel />
         </div>
+
+        {/* Mobile Chat Panel */}
+        <div
+          className={cn(
+            "fixed inset-x-0 bottom-0 z-50 xl:hidden",
+            "transition-transform duration-300 ease-in-out",
+            isChatOpen ? "translate-y-0" : "translate-y-full"
+          )}
+        >
+          <div className="relative h-[80vh] rounded-t-xl border-t bg-background shadow-lg">
+            <div className="sticky top-0 flex items-center justify-between border-b bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <h2 className="text-lg font-semibold">Chat</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsChatOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="h-[calc(80vh-3rem)]">
+              <ChatPanel />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Chat Toggle */}
+        <Button
+          variant="outline"
+          size="icon"
+          className={cn(
+            "fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg xl:hidden",
+            isChatOpen && "translate-y-[-80vh]"
+          )}
+          onClick={() => setIsChatOpen(true)}
+        >
+          <MessageSquare className="h-6 w-6" />
+        </Button>
       </div>
 
       <TaskDialog
         open={isTaskDialogOpen}
         onOpenChange={setIsTaskDialogOpen}
         task={selectedTask}
-        onTaskSaved={() => {
-          setIsTaskDialogOpen(false);
-          loadTasks();
-        }}
+        onTaskSaved={loadTasks}
       />
     </div>
   );
