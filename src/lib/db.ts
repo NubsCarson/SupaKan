@@ -73,6 +73,7 @@ class DbService {
           taskStore.createIndex('status', 'status', { unique: false });
           taskStore.createIndex('created_at', 'created_at', { unique: false });
           taskStore.createIndex('created_by', 'created_by', { unique: false });
+          taskStore.createIndex('position', 'position', { unique: false });
 
           // Create messages store
           const messageStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
@@ -161,15 +162,21 @@ class DbService {
   async createTask(task: Omit<Task, 'id' | 'created_at' | 'updated_at'>): Promise<Task> {
     if (!this.db) throw new Error('Database not initialized');
     
+    // Get all tasks in the same status to calculate position
+    const transaction = this.db.transaction(STORES.TASKS, 'readwrite');
+    const store = transaction.objectStore(STORES.TASKS);
+    const allTasks = await wrapRequest(store.getAll());
+    const tasksInSameStatus = allTasks.filter(t => t.status === task.status);
+    const maxPosition = tasksInSameStatus.reduce((max, t) => Math.max(max, t.position), -1);
+    
     const newTask: Task = {
+      ...task,
       id: uuidv4(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      ...task,
+      position: maxPosition + 1,
     };
 
-    const transaction = this.db.transaction(STORES.TASKS, 'readwrite');
-    const store = transaction.objectStore(STORES.TASKS);
     await wrapRequest(store.add(newTask));
     return newTask;
   }
@@ -285,7 +292,8 @@ class DbService {
           created_by: 'system',
           assigned_to: null,
           labels: ['getting-started', 'documentation'],
-          estimated_hours: 0.5
+          estimated_hours: 0.5,
+          position: 0
         },
         {
           title: '📝 Task Management Features',
@@ -307,7 +315,8 @@ class DbService {
           assigned_to: null,
           labels: ['features', 'tutorial'],
           due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-          estimated_hours: 2
+          estimated_hours: 2,
+          position: 0
         },
         {
           title: '💬 Chat System Overview',
@@ -328,7 +337,8 @@ class DbService {
           created_by: 'system',
           assigned_to: null,
           labels: ['chat', 'collaboration'],
-          estimated_hours: 1
+          estimated_hours: 1,
+          position: 0
         },
         {
           title: '📊 Monitor & Database Tools',
@@ -348,7 +358,8 @@ class DbService {
           assigned_to: null,
           labels: ['tools', 'advanced'],
           due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-          estimated_hours: 1.5
+          estimated_hours: 1.5,
+          position: 1
         },
         {
           title: '✨ Try Creating a New Task',
@@ -370,7 +381,8 @@ class DbService {
           created_by: 'system',
           assigned_to: null,
           labels: ['example', 'tutorial'],
-          estimated_hours: 0.5
+          estimated_hours: 0.5,
+          position: 0
         }
       ];
 

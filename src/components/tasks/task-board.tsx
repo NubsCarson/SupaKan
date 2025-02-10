@@ -94,17 +94,63 @@ export function TaskBoard() {
       if (!task) return;
 
       const newStatus = destination.droppableId as Task['status'];
-      await dbService.updateTask(draggableId, { status: newStatus });
+      const tasksInSourceColumn = tasks.filter(t => t.status === source.droppableId);
+      const tasksInDestColumn = tasks.filter(t => t.status === destination.droppableId);
 
-      setTasks(prev =>
-        prev.map(t =>
-          t.id === draggableId ? { ...t, status: newStatus } : t
+      // Remove task from source column
+      tasksInSourceColumn.splice(source.index, 1);
+
+      // Add task to destination column
+      const updatedTask = { ...task, status: newStatus };
+      tasksInDestColumn.splice(destination.index, 0, updatedTask);
+
+      // Update positions for all affected tasks
+      const updatedTasks = tasks.map(t => {
+        if (t.id === draggableId) {
+          return {
+            ...t,
+            status: newStatus,
+            position: destination.index
+          };
+        }
+        
+        // Update positions in source column
+        if (t.status === source.droppableId) {
+          const newIndex = tasksInSourceColumn.findIndex(st => st.id === t.id);
+          return { ...t, position: newIndex };
+        }
+        
+        // Update positions in destination column
+        if (t.status === destination.droppableId) {
+          const newIndex = tasksInDestColumn.findIndex(dt => dt.id === t.id);
+          return { ...t, position: newIndex };
+        }
+        
+        return t;
+      });
+
+      // Update state immediately
+      setTasks(updatedTasks);
+
+      // Persist the changes
+      const updates = updatedTasks.filter(t => 
+        t.status === source.droppableId || t.status === destination.droppableId
+      );
+      
+      await Promise.all(
+        updates.map(t => 
+          dbService.updateTask(t.id, {
+            status: t.status,
+            position: t.position
+          })
         )
       );
 
       toast({
         title: 'Task updated',
-        description: `Task moved to ${COLUMNS.find(c => c.id === newStatus)?.name}`,
+        description: source.droppableId === destination.droppableId
+          ? 'Task reordered'
+          : `Task moved to ${COLUMNS.find(c => c.id === newStatus)?.name}`,
       });
     } catch (error) {
       toast({
@@ -112,6 +158,8 @@ export function TaskBoard() {
         description: 'Failed to update task',
         variant: 'destructive',
       });
+      // Revert to original state if update fails
+      await loadTasks();
     }
   };
 
@@ -128,6 +176,7 @@ export function TaskBoard() {
         created_by: user.id,
         assigned_to: null,
         labels: [],
+        position: 0
       });
 
       setTasks(prev => [...prev, task]);

@@ -23,6 +23,7 @@ import {
 import { TaskDialog } from './task-dialog';
 import type { Task } from '@/lib/types';
 import { dbService } from '@/lib/db';
+import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
   task: Task;
@@ -58,22 +59,30 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
             {...provided.draggableProps}
             style={{
               ...provided.draggableProps.style,
-              transform: snapshot.isDragging
-                ? provided.draggableProps.style?.transform
-                : 'none',
+              transition: snapshot.isDragging
+                ? undefined
+                : 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
             }}
             className="mb-3"
           >
-            <Card className={`group relative select-none transition-all hover:shadow-md ${
-              snapshot.isDragging ? 'rotate-2 shadow-lg' : ''
-            }`}>
+            <Card className={cn(
+              "group relative select-none transition-all",
+              snapshot.isDragging && "rotate-2 scale-105 shadow-lg ring-2 ring-primary",
+              !snapshot.isDragging && "hover:shadow-md hover:-translate-y-0.5"
+            )}>
               <CardHeader className="p-3">
                 <div className="flex items-start gap-2">
                   <div
                     {...provided.dragHandleProps}
-                    className="mt-1 cursor-grab active:cursor-grabbing"
+                    className={cn(
+                      "mt-1 cursor-grab active:cursor-grabbing",
+                      snapshot.isDragging && "cursor-grabbing"
+                    )}
                   >
-                    <GripVertical className="h-5 w-5 shrink-0 text-muted-foreground/50" />
+                    <GripVertical className={cn(
+                      "h-5 w-5 shrink-0 text-muted-foreground/50",
+                      snapshot.isDragging && "text-primary"
+                    )} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-2">
@@ -84,7 +93,11 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          className={cn(
+                            "h-8 w-8 shrink-0 opacity-0 transition-opacity",
+                            "group-hover:opacity-100",
+                            snapshot.isDragging && "opacity-0"
+                          )}
                           onClick={() => setDialogOpen(true)}
                         >
                           <Pencil className="h-4 w-4" />
@@ -92,7 +105,11 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                          className={cn(
+                            "h-8 w-8 shrink-0 opacity-0 transition-opacity hover:text-destructive",
+                            "group-hover:opacity-100",
+                            snapshot.isDragging && "opacity-0"
+                          )}
                           onClick={() => setDeleteDialogOpen(true)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -102,12 +119,22 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                     <div className="mt-1 flex flex-wrap gap-1">
                       <Badge
                         variant="secondary"
-                        className={priorityColors[task.priority]}
+                        className={cn(
+                          priorityColors[task.priority],
+                          snapshot.isDragging && "ring-1 ring-primary"
+                        )}
                       >
                         {task.priority}
                       </Badge>
                       {task.labels?.map((label) => (
-                        <Badge key={label} variant="outline" className="text-foreground">
+                        <Badge 
+                          key={label} 
+                          variant="outline" 
+                          className={cn(
+                            "text-foreground",
+                            snapshot.isDragging && "ring-1 ring-primary"
+                          )}
+                        >
                           {label}
                         </Badge>
                       ))}

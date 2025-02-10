@@ -12,6 +12,7 @@ export interface Task {
   due_date?: string;
   estimated_hours?: number;
   labels: string[];
+  position: number;
 }
 
 export interface User {
