@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { Board } from '@/components/kanban/board';
 import { Monitor } from '@/components/monitor';
 import { Database } from '@/components/database';
@@ -149,6 +150,7 @@ export default function App() {
     <Router>
       <AuthProvider>
         <Layout />
+        <Analytics />
       </AuthProvider>
     </Router>
   );
