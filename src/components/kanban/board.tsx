@@ -164,13 +164,13 @@ export function Board() {
               return (
                 <div
                   key={id}
-                  className="flex h-full w-[350px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm"
+                  className="flex h-full w-[350px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm dark:bg-card/80"
                 >
                   <div className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <span role="img" aria-label={title}>{icon}</span>
-                        <h2 className="font-semibold">{title}</h2>
+                        <h2 className="font-semibold text-foreground">{title}</h2>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {columnTasks.length}

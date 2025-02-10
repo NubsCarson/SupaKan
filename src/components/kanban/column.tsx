@@ -24,8 +24,8 @@ export function Column({ tasks, onTaskUpdated, onNewTask }: ColumnProps) {
           onClick={onNewTask}
           className="w-full flex flex-col items-center rounded-lg border border-dashed border-muted-foreground/50 bg-muted/50 p-4 transition-colors hover:border-muted-foreground/75 hover:bg-muted/75 hover:cursor-pointer"
         >
-          <PlusCircle className="h-8 w-8 text-muted-foreground/50" />
-          <p className="mt-2 text-sm text-muted-foreground">
+          <PlusCircle className="h-8 w-8 text-muted-foreground hover:text-muted-foreground/75" />
+          <p className="mt-2 text-sm text-foreground/80 dark:text-foreground/90">
             Click to add a task
           </p>
         </button>

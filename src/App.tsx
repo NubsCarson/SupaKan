@@ -7,6 +7,7 @@ import { AuthDialog } from '@/components/auth/auth-dialog';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
+import { Footer } from '@/components/footer';
 import { Github, Terminal, Database as DatabaseIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -134,6 +135,8 @@ function Layout() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      <Footer />
 
       <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
       <Toaster />

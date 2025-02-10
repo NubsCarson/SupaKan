@@ -77,7 +77,7 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-medium leading-none">
+                      <h3 className="text-sm font-medium leading-none text-foreground">
                         {task.title}
                       </h3>
                       <div className="flex items-center gap-1">
@@ -107,7 +107,7 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                         {task.priority}
                       </Badge>
                       {task.labels?.map((label) => (
-                        <Badge key={label} variant="outline">
+                        <Badge key={label} variant="outline" className="text-foreground">
                           {label}
                         </Badge>
                       ))}
@@ -118,7 +118,7 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
               {task.description && (
                 <CardContent className="px-3 py-2">
                   <div
-                    className="prose prose-sm max-w-none text-sm text-muted-foreground [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+                    className="prose prose-sm max-w-none text-sm text-foreground dark:prose-invert [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                     dangerouslySetInnerHTML={{ __html: task.description }}
                   />
                 </CardContent>
@@ -136,7 +136,7 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
                     <span>{task.estimated_hours}h</span>
                   </div>
                 )}
-                <div className="ml-auto font-mono text-[10px] opacity-50">
+                <div className="ml-auto font-mono text-[10px] text-muted-foreground/70">
                   {task.ticket_id}
                 </div>
               </CardFooter>
