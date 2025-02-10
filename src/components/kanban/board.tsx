@@ -118,7 +118,7 @@ export function Board() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
         <div className="flex items-center gap-2">
           <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
           <span className="text-lg font-medium">Loading...</span>
@@ -137,7 +137,7 @@ export function Board() {
   const doneTasks = tasks.filter(task => task.status === 'done');
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    <div className="flex h-[calc(100vh-8rem)] flex-col">
       <div className="flex items-center justify-between px-4 py-2">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">Project Board</h1>
@@ -154,7 +154,7 @@ export function Board() {
         </Button>
       </div>
 
-      <div className="flex flex-1 gap-4 p-4">
+      <div className="flex flex-1 gap-4 overflow-x-auto p-4">
         <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="flex flex-1 gap-4">
             {columns.map(({ id, title, icon }) => {
