@@ -45,3 +45,5 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 reference/
+
+*storybook.log

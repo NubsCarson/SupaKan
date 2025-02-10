@@ -3,17 +3,16 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate, Outlet } from '
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Board } from '@/components/kanban/board';
-import { Monitor } from '@/components/monitor';
-import { Database } from '@/components/database';
 import { AuthDialog } from '@/components/auth/auth-dialog';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Footer } from '@/components/footer';
-import { Github, Terminal, Database as DatabaseIcon } from 'lucide-react';
+import { Github, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
+import { SystemDashboard } from '@/components/system-dashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -55,22 +54,13 @@ function Layout() {
                 Board
               </Link>
               <Link
-                to="/monitor"
+                to="/dashboard"
                 className={cn(
                   'transition-colors hover:text-foreground/80',
                   'text-foreground/60'
                 )}
               >
-                <Terminal className="h-5 w-5" />
-              </Link>
-              <Link
-                to="/database"
-                className={cn(
-                  'transition-colors hover:text-foreground/80',
-                  'text-foreground/60'
-                )}
-              >
-                <DatabaseIcon className="h-5 w-5" />
+                <Gauge className="h-5 w-5" />
               </Link>
             </nav>
           </div>
@@ -125,8 +115,7 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/*" element={<Layout />}>
       <Route index element={<ProtectedRoute><Board /></ProtectedRoute>} />
-      <Route path="monitor" element={<ProtectedRoute><Monitor /></ProtectedRoute>} />
-      <Route path="database" element={<ProtectedRoute><Database /></ProtectedRoute>} />
+      <Route path="dashboard" element={<ProtectedRoute><SystemDashboard /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   )

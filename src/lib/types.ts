@@ -41,4 +41,27 @@ export interface ChatMessage {
 export interface AuthResponse {
   user: Omit<User, 'password'>;
   token: string;
+}
+
+export interface TableSchema {
+  name: string;
+  description: string;
+  fields: {
+    name: string;
+    type: string;
+    required: boolean;
+    description: string;
+  }[];
+}
+
+export interface DBStats {
+  totalRecords: number;
+  lastUpdated: string;
+  storageUsed: string;
+  indices: string[];
+  queryPerformance?: {
+    slowQueries: number;
+    avgResponseTime: number;
+  };
+  connections?: number;
 } 
