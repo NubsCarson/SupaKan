@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Kanban Board OG Image</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      width: 1200px;
+      height: 630px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+      padding: 4rem;
+      text-align: center;
+    }
+    .logo {
+      font-size: 4rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #646cff 0%, #9c9eff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 1rem;
+    }
+    .title {
+      font-size: 3rem;
+      font-weight: bold;
+      margin: 0;
+    }
+    .description {
+      font-size: 1.5rem;
+      color: #888;
+      max-width: 800px;
+      margin: 0;
+    }
+    .features {
+      display: flex;
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.25rem;
+      color: #646cff;
+    }
+    .feature::before {
+      content: "•";
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">Kanban</div>
+    <h1 class="title">Modern Task Management</h1>
+    <p class="description">A powerful Kanban board with rich task management, real-time chat, and monitoring tools</p>
+    <div class="features">
+      <div class="feature">Task Management</div>
+      <div class="feature">Real-time Chat</div>
+      <div class="feature">Analytics</div>
+    </div>
+  </div>
+</body>
+</html> 
