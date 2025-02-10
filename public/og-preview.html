@@ -61,19 +61,96 @@
       font-weight: 500;
     }
     .preview {
-      width: 400px;
+      width: 500px;
       height: 400px;
       background: rgba(255, 255, 255, 0.03);
       border-radius: 1rem;
+      padding: 1.5rem;
       display: flex;
-      flex-direction: column;
-      padding: 1rem;
+      gap: 1rem;
+      transform: rotate(-10deg);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    }
+    .board {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 1rem;
     }
     .column {
-      flex: 1;
+      height: 100%;
       background: rgba(255, 255, 255, 0.06);
       border-radius: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .column::after {
+      content: '';
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      right: 1rem;
+      height: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0.25rem;
+    }
+    .column::before {
+      content: '';
+      position: absolute;
+      top: 3rem;
+      left: 1rem;
+      right: 1rem;
+      bottom: 1rem;
+      background: rgba(100, 108, 255, 0.1);
+      border-radius: 0.25rem;
+    }
+    .column:nth-child(2)::before {
+      background: rgba(100, 108, 255, 0.15);
+    }
+    .column:nth-child(3)::before {
+      background: rgba(100, 108, 255, 0.2);
+    }
+    .chat {
+      width: 120px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 0.5rem;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header {
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .message {
+      height: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0.25rem;
+      width: 80%;
+    }
+    .message:nth-child(even) {
+      width: 60%;
+      margin-left: auto;
+      background: rgba(100, 108, 255, 0.2);
+    }
+    .chat-input {
+      padding: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .input-bar {
+      height: 0.75rem;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 0.25rem;
     }
   </style>
 </head>
@@ -90,9 +167,24 @@
       </div>
     </div>
     <div class="preview">
-      <div class="column"></div>
-      <div class="column"></div>
-      <div class="column"></div>
+      <div class="board">
+        <div class="column"></div>
+        <div class="column"></div>
+        <div class="column"></div>
+      </div>
+      <div class="chat">
+        <div class="chat-header"></div>
+        <div class="chat-messages">
+          <div class="message"></div>
+          <div class="message"></div>
+          <div class="message"></div>
+          <div class="message"></div>
+          <div class="message"></div>
+        </div>
+        <div class="chat-input">
+          <div class="input-bar"></div>
+        </div>
+      </div>
     </div>
   </div>
 </body>
