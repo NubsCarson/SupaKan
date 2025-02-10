@@ -2,9 +2,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import { Editor } from '@/components/ui/editor';
 import { dbService } from '@/lib/db';
 import type { Task } from '@/lib/types';
 
@@ -18,6 +20,16 @@ interface TaskDialogProps {
 export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: task?.description || '',
+    editorProps: {
+      attributes: {
+        class: 'min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-foreground',
+      },
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -26,12 +38,12 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
       const formData = new FormData(e.currentTarget);
       const data = {
         title: formData.get('title') as string,
-        description: formData.get('description') as string,
+        description: editor?.getHTML() || '',
         status: formData.get('status') as Task['status'],
         priority: formData.get('priority') as Task['priority'],
         due_date: formData.get('due_date') as string || undefined,
-        position: task?.position || 0, // Keep existing position or default to 0 for new tasks
-        created_by: 'user', // TODO: Get from auth context
+        position: task?.position || 0,
+        created_by: 'user',
         assigned_to: null,
         ticket_id: task?.ticket_id || crypto.randomUUID(),
         labels: task?.labels || [],
@@ -80,16 +92,10 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="description" className="text-sm font-medium">
+              <Label className="text-sm font-medium">
                 Description
               </Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Enter task description"
-                className="min-h-[100px] w-full resize-y"
-                defaultValue={task?.description || ''}
-              />
+              <Editor editor={editor} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">

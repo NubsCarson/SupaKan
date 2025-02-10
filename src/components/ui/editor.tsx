@@ -26,7 +26,7 @@ export function Editor({ editor, className }: EditorProps) {
   }
 
   return (
-    <div className={cn('rounded-md border', className)}>
+    <div className={cn('rounded-md border bg-background', className)}>
       <div className="flex flex-wrap gap-1 border-b bg-muted/50 p-1">
         <Toggle
           size="sm"
@@ -106,7 +106,7 @@ export function Editor({ editor, className }: EditorProps) {
       </div>
       <EditorContent 
         editor={editor} 
-        className="prose prose-sm max-w-none p-4 focus:outline-none"
+        className="prose prose-sm dark:prose-invert max-w-none p-4 focus:outline-none text-foreground"
       />
     </div>
   );
