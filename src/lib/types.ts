@@ -16,13 +16,12 @@ export interface Task {
 
 export interface User {
   id: string;
-  ticket_id: string;
   username: string;
   email: string;
-  password: string; // This will be hashed
-  avatar_url?: string;
+  password: string;
   created_at: string;
   updated_at: string;
+  ticket_id: string;
 }
 
 export interface ChatMessage {

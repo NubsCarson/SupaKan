@@ -97,38 +97,78 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
     if (!validateForm()) return;
 
     try {
-      if (isSignUp) {
-        const response = await dbService.signUp({
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
+      // Initialize database before any operation
+      try {
+        await dbService.initialize();
+      } catch (error) {
+        toast({
+          title: 'Database Error',
+          description: error instanceof Error ? error.message : 'Failed to initialize database. Please try again.',
+          variant: 'destructive',
         });
-        if (response) {
-          setUser(response.user);
-          toast({
-            title: 'Account created!',
-            description: `Welcome! Your account has been created. Your ticket ID is ${response.user.ticket_id}`,
+        return;
+      }
+      
+      if (isSignUp) {
+        try {
+          const response = await dbService.signUp({
+            username: formData.username,
+            email: formData.email,
+            password: formData.password,
           });
+          if (response) {
+            setUser(response.user);
+            toast({
+              title: 'Account created!',
+              description: `Welcome! Your account has been created successfully.`,
+            });
+            onOpenChange(false);
+            navigate('/');
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            toast({
+              title: 'Account Creation Failed',
+              description: error.message || 'Failed to create account. Please try again.',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Account Creation Failed',
+              description: 'An unexpected error occurred. Please try again.',
+              variant: 'destructive',
+            });
+          }
+          return;
         }
       } else {
-        const response = await dbService.signIn({
-          email: formData.email,
-          password: formData.password,
-        });
-        if (response) {
-          setUser(response.user);
-          toast({
-            title: 'Welcome back!',
-            description: 'You have successfully signed in.',
+        try {
+          const response = await dbService.signIn({
+            email: formData.email,
+            password: formData.password,
           });
+          if (response) {
+            setUser(response.user);
+            toast({
+              title: 'Welcome back!',
+              description: 'You have successfully signed in.',
+            });
+            onOpenChange(false);
+            navigate('/');
+          }
+        } catch (error) {
+          toast({
+            title: 'Sign In Failed',
+            description: error instanceof Error ? error.message : 'Invalid credentials.',
+            variant: 'destructive',
+          });
+          return;
         }
       }
-      onOpenChange(false);
-      navigate('/');
     } catch (error) {
       toast({
         title: 'Error',
-        description: isSignUp ? 'Failed to create account.' : 'Invalid credentials.',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
         variant: 'destructive',
       });
     }
@@ -167,6 +207,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 placeholder="johndoe"
                 value={formData.username}
                 onChange={handleInputChange}
+                autoComplete="username"
               />
               {errors.username && (
                 <p className="text-sm text-destructive">{errors.username}</p>
@@ -183,6 +224,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               placeholder="john@example.com"
               value={formData.email}
               onChange={handleInputChange}
+              autoComplete="email"
             />
             {errors.email && (
               <p className="text-sm text-destructive">{errors.email}</p>
@@ -197,6 +239,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               type="password"
               value={formData.password}
               onChange={handleInputChange}
+              autoComplete={isSignUp ? "new-password" : "current-password"}
             />
             {errors.password && (
               <p className="text-sm text-destructive">{errors.password}</p>
@@ -212,6 +255,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 type="password"
                 value={formData.confirmPassword}
                 onChange={handleInputChange}
+                autoComplete="new-password"
               />
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive">{errors.confirmPassword}</p>

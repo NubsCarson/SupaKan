@@ -24,42 +24,74 @@ class DbService {
   async initialize(): Promise<void> {
     if (this.db) return;
 
+    // Check if IndexedDB is available
+    if (!window.indexedDB) {
+      throw new Error('Your browser does not support IndexedDB. Please use a modern browser.');
+    }
+
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      try {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => {
-        console.error('Failed to open database:', request.error);
-        reject(request.error);
-      };
+        request.onerror = (event) => {
+          const error = request.error;
+          console.error('Failed to open database:', error);
+          if (error?.name === 'SecurityError') {
+            reject(new Error('Access to IndexedDB was blocked. Please check your browser settings.'));
+          } else if (error?.name === 'QuotaExceededError') {
+            reject(new Error('Not enough storage space available. Please free up some space.'));
+          } else {
+            reject(error || new Error('Failed to initialize database'));
+          }
+        };
 
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        
-        // Create users store if it doesn't exist
-        if (!db.objectStoreNames.contains(STORES.USERS)) {
-          const userStore = db.createObjectStore(STORES.USERS, { keyPath: 'id' });
-          userStore.createIndex('email', 'email', { unique: true });
-        }
+        request.onblocked = () => {
+          reject(new Error('Database initialization was blocked. Please close other tabs with this app.'));
+        };
 
-        // Create tasks store if it doesn't exist
-        if (!db.objectStoreNames.contains(STORES.TASKS)) {
-          const taskStore = db.createObjectStore(STORES.TASKS, { keyPath: 'id' });
-          taskStore.createIndex('status', 'status', { unique: false });
-          taskStore.createIndex('created_at', 'created_at', { unique: false });
-        }
+        request.onupgradeneeded = (event) => {
+          const db = (event.target as IDBOpenDBRequest).result;
+          
+          // Create users store if it doesn't exist
+          if (!db.objectStoreNames.contains(STORES.USERS)) {
+            const userStore = db.createObjectStore(STORES.USERS, { keyPath: 'id' });
+            userStore.createIndex('email', 'email', { unique: true });
+          }
 
-        // Create messages store if it doesn't exist
-        if (!db.objectStoreNames.contains(STORES.MESSAGES)) {
-          const messageStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
-          messageStore.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-      };
+          // Create tasks store if it doesn't exist
+          if (!db.objectStoreNames.contains(STORES.TASKS)) {
+            const taskStore = db.createObjectStore(STORES.TASKS, { keyPath: 'id' });
+            taskStore.createIndex('status', 'status', { unique: false });
+            taskStore.createIndex('created_at', 'created_at', { unique: false });
+          }
 
-      request.onsuccess = async () => {
-        this.db = request.result;
-        await this.initializeSampleData();
-        resolve();
-      };
+          // Create messages store if it doesn't exist
+          if (!db.objectStoreNames.contains(STORES.MESSAGES)) {
+            const messageStore = db.createObjectStore(STORES.MESSAGES, { keyPath: 'id' });
+            messageStore.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+        };
+
+        request.onsuccess = async () => {
+          try {
+            this.db = request.result;
+            
+            // Add error handler for database connection
+            this.db.onerror = (event) => {
+              console.error('Database error:', (event.target as IDBOpenDBRequest).error);
+            };
+
+            await this.initializeSampleData();
+            resolve();
+          } catch (error) {
+            console.error('Error during database initialization:', error);
+            reject(error);
+          }
+        };
+      } catch (error) {
+        console.error('Critical error during database setup:', error);
+        reject(error);
+      }
     });
   }
 
@@ -83,6 +115,8 @@ class DbService {
       email: data.email,
       password: data.password, // In a real app, this should be hashed
       created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ticket_id: `USER-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
     };
 
     await wrapRequest(store.add(user));
