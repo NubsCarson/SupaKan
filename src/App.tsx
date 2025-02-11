@@ -8,13 +8,34 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Footer } from '@/components/footer';
-import { Github, Gauge } from 'lucide-react';
+import { Github, Gauge, LogOut, Settings, User, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { SystemDashboard } from '@/components/system-dashboard';
 import AuthCallback from '@/routes/auth/callback';
 import { Logo } from '@/components/logo';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 function LoadingSpinner() {
   return (
@@ -49,7 +70,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function Layout() {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+  const { toast } = useToast();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      toast({
+        title: "Signed out successfully",
+        description: "Come back soon!",
+      });
+    } catch (error) {
+      console.error('Error signing out:', error);
+      toast({
+        title: "Error signing out",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    }
+  };
 
   if (loading) {
     return <LoadingSpinner />;
@@ -93,10 +135,75 @@ function Layout() {
                 <Github className="h-4 w-4" />
               </a>
               <ModeToggle />
+              {isAuthenticated && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                      <Avatar className="h-9 w-9">
+                        <AvatarImage src={user?.user_metadata?.avatar_url} alt={user?.email || ''} />
+                        <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">Account</p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user?.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => {
+                      toast({
+                        title: "Coming Soon",
+                        description: "Profile settings will be available in a future update!",
+                      });
+                    }}>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      toast({
+                        title: "Coming Soon",
+                        description: "Settings will be available in a future update!",
+                      });
+                    }}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowSignOutConfirm(true)}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </div>
       </header>
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will need to sign in again to access your boards and tasks.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowSignOutConfirm(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleSignOut}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sign out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <main className="flex-1">
         <Outlet />
       </main>
