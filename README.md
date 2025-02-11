@@ -155,4 +155,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 If you find this project helpful, please consider giving it a star ⭐️
 
-Visit the live demo at [https://kanban.nubs.site](https://kanban.nubs.site) 
+Visit the live demo at [https://kanban.nubs.site](https://kanban.nubs.site)
+
+## 🚀 Deployment
+
+### Deploying to Vercel
+
+1. Fork this repository to your GitHub account
+2. Create a new project on [Vercel](https://vercel.com)
+3. Import your forked repository
+4. Configure the following environment variables in your Vercel project settings:
+   ```
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_APP_URL=your_vercel_deployment_url
+   ```
+5. Deploy! Vercel will automatically build and deploy your application
+
+### Environment Variables
+
+Make sure to set up the following environment variables in your Vercel project:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| VITE_SUPABASE_URL | Your Supabase project URL | Yes |
+| VITE_SUPABASE_ANON_KEY | Your Supabase anonymous key | Yes |
+| VITE_APP_URL | Your application URL | Yes |
+| VITE_APP_NAME | Your application name | No |
+| VITE_ENABLE_ANALYTICS | Enable/disable analytics | No | 
