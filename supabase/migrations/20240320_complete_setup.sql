@@ -192,7 +192,7 @@ BEGIN
 
         -- Create default board
         INSERT INTO boards (name, description, team_id, created_by)
-        VALUES ('My First Board', 'Welcome to your first Kanban board!', _team_id, NEW.id)
+        VALUES ('Project Board', 'Welcome to your first Kanban board!', _team_id, NEW.id)
         RETURNING id INTO _board_id;
 
         -- Create example tasks with different positions
@@ -200,24 +200,38 @@ BEGIN
         _position := 65536;
         INSERT INTO tasks (
             title, description, status, priority, position,
-            ticket_id, board_id, team_id, created_by
+            ticket_id, board_id, team_id, created_by,
+            labels
         ) VALUES (
-            'Welcome to Kanban!',
-            'This is an example task in your backlog. Feel free to edit or delete it.',
-            'backlog', 'medium', _position,
-            'TASK-001', _board_id, _team_id, NEW.id
+            'Welcome to Kanban Board!',
+            'Welcome to your new Kanban board! Here are some tips to help you get started:
+
+- Drag and drop tasks between columns to update their status
+- Click the "New Task" button to create your own tasks
+- Use the rich text editor to format task descriptions
+- Try the chat panel to collaborate with your team',
+            'backlog', 'high', _position,
+            'TASK-001', _board_id, _team_id, NEW.id,
+            ARRAY['getting started', 'documentation']
         );
 
         -- Todo
         _position := _position + 65536;
         INSERT INTO tasks (
             title, description, status, priority, position,
-            ticket_id, board_id, team_id, created_by
+            ticket_id, board_id, team_id, created_by,
+            labels
         ) VALUES (
-            'Create your first task',
-            'Click the "New Task" button to create your own task.',
-            'todo', 'high', _position,
-            'TASK-002', _board_id, _team_id, NEW.id
+            'Chat System Overview',
+            'Real-time team communication features:
+
+- Pin important messages
+- Like and reply to messages
+- Mention team members using @username
+- Link messages to specific tasks',
+            'todo', 'low', _position,
+            'TASK-002', _board_id, _team_id, NEW.id,
+            ARRAY['chat', 'collaboration']
         );
 
         -- In Progress
@@ -227,11 +241,19 @@ BEGIN
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Try dragging tasks',
-            'You can drag and drop tasks between columns to update their status.',
+            'Task Management Features',
+            'Key Features:
+
+- Set priority levels (low, medium, high)
+- Add due dates and time estimates
+- Assign tasks to team members
+- Add labels for organization
+- Track task progress across columns
+
+Try editing this task to explore these features!',
             'in_progress', 'medium', _position,
             'TASK-003', _board_id, _team_id, NEW.id,
-            ARRAY['example', 'tutorial']
+            ARRAY['features', 'tutorial']
         );
 
         -- In Review
@@ -239,38 +261,89 @@ BEGIN
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
-            due_date
+            labels
         ) VALUES (
-            'Set due dates',
-            'Tasks can have due dates, labels, and priority levels.',
-            'in_review', 'low', _position,
+            'Monitor & Database Tools',
+            'Check out these powerful tools:
+
+- System Monitor: Real-time metrics and activity logs
+- Database Explorer: View data structure and sample records
+
+Click the icons in the top navigation to explore these features!',
+            'in_review', 'medium', _position,
             'TASK-004', _board_id, _team_id, NEW.id,
-            NOW() + INTERVAL '7 days'
+            ARRAY['tools', 'advanced']
         );
 
         -- Done
         _position := _position + 65536;
         INSERT INTO tasks (
             title, description, status, priority, position,
-            ticket_id, board_id, team_id, created_by
+            ticket_id, board_id, team_id, created_by,
+            labels
         ) VALUES (
-            'Complete setup',
-            'Congratulations! Your board is ready to use.',
-            'done', 'medium', _position,
-            'TASK-005', _board_id, _team_id, NEW.id
+            'Try Creating a New Task',
+            'Ready to add your own task? Here''s how:
+
+1. Click the "New Task" button at the top
+2. Fill in the task details
+3. Use the rich text editor for formatting
+4. Set priority, due date, and time estimate
+5. Add labels for organization
+
+Give it a try now!',
+            'done', 'low', _position,
+            'TASK-005', _board_id, _team_id, NEW.id,
+            ARRAY['example', 'tutorial']
         );
 
-        -- Create welcome message
+        -- Create welcome messages
         INSERT INTO messages (
             content,
             team_id,
             user_id,
             is_pinned
         ) VALUES (
-            'Welcome to your team workspace! 👋 Here you can chat with your team members, share updates, and collaborate on tasks. Need help? Check out the example tasks on your board.',
+            '👋 Welcome to the team chat! This is where you can collaborate with your team members.',
             _team_id,
             NEW.id,
             true
+        );
+
+        INSERT INTO messages (
+            content,
+            team_id,
+            user_id,
+            is_pinned
+        ) VALUES (
+            '💡 Tip: You can pin important messages, like announcements or guidelines, by clicking the pin icon.',
+            _team_id,
+            NEW.id,
+            true
+        );
+
+        INSERT INTO messages (
+            content,
+            team_id,
+            user_id,
+            is_pinned
+        ) VALUES (
+            '👥 Try mentioning team members using @username or linking to tasks using their ticket IDs (e.g., TASK-0001)',
+            _team_id,
+            NEW.id,
+            false
+        );
+
+        INSERT INTO messages (
+            content,
+            team_id,
+            user_id,
+            is_pinned
+        ) VALUES (
+            '🎉 Welcome to the team chat! This is where you can collaborate with your team members.',
+            _team_id,
+            NEW.id,
+            false
         );
     END IF;
 
