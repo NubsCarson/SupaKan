@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { SystemDashboard } from '@/components/system-dashboard';
 import AuthCallback from '@/routes/auth/callback';
+import { Logo } from '@/components/logo';
 
 function LoadingSpinner() {
   return (
@@ -59,13 +60,19 @@ function Layout() {
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 max-w-screen-2xl items-center">
           <div className="mr-4 flex">
-            <Link to="/" className="mr-6 flex items-center space-x-2">
-              <span className="font-bold sm:inline-block">Kanbann</span>
+            <Link to="/" className="mr-6 flex items-center space-x-3">
+              <Logo className="h-8 w-8" />
+              <span className="hidden text-lg font-bold sm:inline-block">SupaKan</span>
             </Link>
             {isAuthenticated && (
               <nav className="flex items-center space-x-6 text-sm font-medium">
-                <Link to="/" className="transition-colors hover:text-foreground/80">Board</Link>
-                <Link to="/dashboard" className="transition-colors hover:text-foreground/80">Dashboard</Link>
+                <Link 
+                  to="/dashboard" 
+                  className="transition-colors hover:text-foreground/80"
+                  title="System Dashboard"
+                >
+                  <Gauge className="h-5 w-5" />
+                </Link>
               </nav>
             )}
           </div>
@@ -77,7 +84,7 @@ function Layout() {
                 href="https://github.com/nubs4dayz/kanbann"
                 className={cn(
                   "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2",
                   "disabled:pointer-events-none disabled:opacity-50",
                   "hover:bg-accent hover:text-accent-foreground",
                   "h-9 px-3"
@@ -106,13 +113,7 @@ const router = createBrowserRouter(
       <Route path="auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
-  ),
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    }
-  }
+  )
 );
 
 export default function App() {
