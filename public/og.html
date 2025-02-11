@@ -2,8 +2,16 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Kanban Board OG Image</title>
+  <title>SupaKan OG Image</title>
   <style>
+    :root {
+      --supa-gradient: linear-gradient(135deg, #00c8bc 0%, #14b8a6 100%);
+      --kan-gradient: linear-gradient(135deg, #3ecf8e 0%, #00c8bc 100%);
+      --text-gradient: var(--kan-gradient);
+      --bg-gradient: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+      --supa-color: #00c8bc;
+      --kan-color: #3ecf8e;
+    }
     body {
       margin: 0;
       padding: 0;
@@ -12,7 +20,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+      background: var(--bg-gradient);
       color: white;
       font-family: system-ui, -apple-system, sans-serif;
     }
@@ -27,21 +35,33 @@
     .logo {
       font-size: 4rem;
       font-weight: bold;
-      background: linear-gradient(135deg, #646cff 0%, #9c9eff 100%);
+      margin-bottom: 1rem;
+      display: flex;
+    }
+    .logo-supa {
+      color: #00c8bc;
+    }
+    .logo-kan {
+      background: var(--kan-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      margin-bottom: 1rem;
     }
     .title {
       font-size: 3rem;
       font-weight: bold;
       margin: 0;
+      background: var(--text-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
     .description {
       font-size: 1.5rem;
-      color: #888;
+      background: var(--text-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
       max-width: 800px;
       margin: 0;
+      opacity: 0.8;
     }
     .features {
       display: flex;
@@ -53,22 +73,51 @@
       align-items: center;
       gap: 0.5rem;
       font-size: 1.25rem;
-      color: #646cff;
+      background: var(--text-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 500;
     }
     .feature::before {
       content: "•";
+      background: var(--text-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .powered-by {
+      margin-top: 2rem;
+      font-size: 1.25rem;
+      background: var(--text-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      opacity: 0.8;
+    }
+    .tech {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: linear-gradient(135deg, rgba(62, 207, 142, 0.1) 0%, rgba(0, 200, 188, 0.1) 100%);
+      margin: 0 0.5rem;
+      color: var(--kan-color);
+      border: 1px solid rgba(62, 207, 142, 0.2);
+      font-weight: 500;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="logo">Kanban</div>
+    <div class="logo">
+      <span class="logo-supa">Supa</span><span class="logo-kan">Kan</span>
+    </div>
     <h1 class="title">Modern Task Management</h1>
-    <p class="description">A powerful Kanban board with rich task management, real-time chat, and monitoring tools</p>
+    <p class="description">A powerful Kanban board with real-time collaboration, built entirely on Supabase</p>
     <div class="features">
-      <div class="feature">Task Management</div>
-      <div class="feature">Real-time Chat</div>
-      <div class="feature">Analytics</div>
+      <div class="feature">Real-time Updates</div>
+      <div class="feature">Team Chat</div>
+      <div class="feature">Rich Analytics</div>
+    </div>
+    <div class="powered-by">
+      Powered by <span class="tech">Supabase</span> + <span class="tech">Vercel</span>
     </div>
   </div>
 </body>

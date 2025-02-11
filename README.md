@@ -1,185 +1,171 @@
-# SupaKan - Supabase-Powered Kanban Board
+# SupaKan - Instant Task Management Powered by Supabase
 
-A modern, real-time Kanban board application built with React, TypeScript, and Supabase. Features include team collaboration, real-time updates, and a built-in chat system.
+![SupaKan Preview](public/og-preview.png)
 
-## Features
+A modern task management platform built **100% on Supabase** - no additional backend required! Experience true real-time collaboration with instant updates for both solo work and team projects. Every feature, from task movements to team chat, updates instantly across all connected users.
 
-- 📋 Drag-and-drop Kanban board
-- 💬 Real-time team chat
-- 🔄 Real-time updates across all components
-- 👥 Team collaboration
-- 📌 Message pinning and reactions
-- 🎨 Modern UI with dark mode support
-- 🔒 Secure authentication with Supabase
+## 🌟 Why SupaKan?
 
-## Tech Stack
+- **Zero Backend Setup** - Built entirely on Supabase
+- **Instant Real-time Updates** - Everything syncs automatically
+- **Works Solo or Team** - Scale from personal use to full team collaboration
+- **No Extra Services** - Chat, tasks, and collaboration all in one place
+
+## ✨ Key Features
+
+- 🔄 **True Real-time Experience**:
+  - Tasks update instantly across all users
+  - Live team chat with instant message delivery
+  - Real-time notifications for mentions and updates
+  - See who's online and typing indicators
+  
+- 📋 **Smart Task Management**:
+  - Drag-and-drop Kanban board
+  - Automatic position syncing
+  - Rich text task descriptions
+  - Custom labels and priorities
+  - Due dates and time tracking
+  
+- 💬 **Built-in Team Chat**:
+  - Instant message delivery
+  - Pin important messages
+  - React with emojis
+  - Thread discussions
+  - Mention team members
+  
+- 👥 **Flexible Usage Modes**:
+  - Personal task management
+  - Small team collaboration
+  - Large team organization
+  - Custom team permissions
+
+## 🚀 Built on Supabase
+
+Everything runs on Supabase's powerful features:
+
+- **Real-time PostgreSQL** - Instant data sync
+- **Row Level Security** - Enterprise-grade security
+- **Auth** - Multiple sign-in options
+- **Edge Functions** - Serverless operations
+- **Storage** - File attachments
+
+## 🛠️ Tech Stack
 
 - **Frontend:**
-  - React
+  - React 18
   - TypeScript
   - Tailwind CSS
   - Shadcn/ui
+  - TipTap Editor
   - React Beautiful DND
 
-- **Backend:**
-  - Supabase (Database, Auth, Real-time)
+- **Backend (All Supabase):**
+  - PostgreSQL Database
+  - Real-time Subscriptions
+  - Row Level Security
+  - Authentication
+  - Storage
 
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js (v16+)
 - npm or yarn
 - Supabase account
 
-### Installation
+### Setup in 4 Steps
 
-1. Clone the repository:
+1. Clone and install:
    ```bash
    git clone https://github.com/NubsCarson/SupaKan.git
    cd SupaKan
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
-   # or
-   yarn install
    ```
 
-3. Create a `.env` file in the root directory and add your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+2. Create a Supabase project and run migrations:
+   ```bash
+   npm run supabase:start
+   npm run supabase:db-reset
    ```
 
-4. Start the development server:
+3. Set up environment:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase credentials
+   ```
+
+4. Start developing:
    ```bash
    npm run dev
-   # or
-   yarn dev
    ```
 
-### Database Setup
+Visit `http://localhost:5173` to see your app!
 
-1. Create a new Supabase project
-2. Run the migration scripts in the `supabase/migrations` folder
-3. Enable real-time functionality for the required tables
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 src/
 ├── components/        # React components
-│   ├── kanban/       # Kanban board components
-│   ├── chat/         # Chat components
+│   ├── kanban/       # Board & task components
+│   ├── chat/         # Real-time chat components
 │   └── ui/           # Shared UI components
-├── lib/              # Utilities and helpers
-├── hooks/            # Custom React hooks
-└── types/            # TypeScript type definitions
+├── lib/              # Supabase & utility functions
+├── hooks/            # React hooks
+└── types/            # TypeScript definitions
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- [Supabase](https://supabase.io/) for the amazing backend platform
-- [Shadcn/ui](https://ui.shadcn.com/) for the beautiful UI components
-- [React Beautiful DND](https://github.com/atlassian/react-beautiful-dnd) for the drag-and-drop functionality
-
-## 🛠️ Development
+## 🔧 Development Commands
 
 ```bash
-# Run development server
-npm run dev
+npm run dev          # Start development
+npm run build        # Production build
+npm run preview      # Preview build
+npm run lint         # Lint code
+npm run typecheck    # Type checking
+npm run clean        # Clean build files
 
-# Type checking
-npm run typecheck
-
-# Linting
-npm run lint
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Clean build files
-npm run clean
+# Supabase Commands
+npm run supabase:start    # Start local Supabase
+npm run supabase:stop     # Stop local Supabase
+npm run supabase:db-reset # Reset database
 ```
-
-## 🔧 Configuration
-
-The application supports various configuration options through environment variables:
-
-```env
-VITE_APP_NAME=Kanban Board
-VITE_APP_URL=http://localhost:5173
-```
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'feat: add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a pull request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components
-- [TipTap](https://tiptap.dev/) - Powerful rich text editor
-- [react-beautiful-dnd](https://github.com/atlassian/react-beautiful-dnd) - Smooth drag and drop
-- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
-- [Vite](https://vitejs.dev/) - Next generation frontend tooling
-- [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible components
-
-## 🌟 Support
-
-If you find this project helpful, please consider giving it a star ⭐️
-
-Visit the live demo at [https://kanban.nubs.site](https://kanban.nubs.site)
 
 ## 🚀 Deployment
 
-### Deploying to Vercel
+### Deploy to Vercel
 
-1. Fork this repository to your GitHub account
-2. Create a new project on [Vercel](https://vercel.com)
-3. Import your forked repository
-4. Configure the following environment variables in your Vercel project settings:
-   ```
-   VITE_SUPABASE_URL=your_supabase_project_url
+1. Fork this repository
+2. Create a new Vercel project
+3. Connect your fork
+4. Set environment variables:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_APP_URL=your_vercel_deployment_url
+   VITE_APP_URL=your_vercel_url
    ```
-5. Deploy! Vercel will automatically build and deploy your application
+5. Deploy!
 
-### Environment Variables
+## 🌟 Support
 
-Make sure to set up the following environment variables in your Vercel project:
+If you find SupaKan helpful, please give it a star ⭐️
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| VITE_SUPABASE_URL | Your Supabase project URL | Yes |
-| VITE_SUPABASE_ANON_KEY | Your Supabase anonymous key | Yes |
-| VITE_APP_URL | Your application URL | Yes |
-| VITE_APP_NAME | Your application name | No |
-| VITE_ENABLE_ANALYTICS | Enable/disable analytics | No | 
+Try the live demo at [https://supakan.nubs.site](https://supakan.nubs.site)
+
+## 📝 License
+
+MIT License - See [LICENSE](LICENSE)
+
+## 🙏 Acknowledgments
+
+- [Supabase](https://supabase.io/) - The backbone of our entire application
+- [Shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components
+- [TipTap](https://tiptap.dev/) - Rich text editing
+- [React Beautiful DND](https://github.com/atlassian/react-beautiful-dnd) - Smooth drag and drop
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Vite](https://vitejs.dev/) - Build tool 
+
+---
+<div align="center">
+  Built with 💚 by <a href="https://github.com/NubsCarson">NubsCarson</a>
+</div> 

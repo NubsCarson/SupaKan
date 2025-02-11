@@ -31,7 +31,7 @@ export function Footer() {
     <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          © {currentYear} Kanban Board. All rights reserved.
+          © {currentYear} SupaKan. All rights reserved.
         </p>
         <div className="flex items-center space-x-1">
           {socialLinks.map(({ icon: Icon, href, label }) => (

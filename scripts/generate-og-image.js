@@ -6,34 +6,58 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 async function generateOGImage() {
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox']
-  });
-  const page = await browser.newPage();
+  console.log('Starting OG image generation...');
+  let browser;
   
-  // Set viewport to match OG image dimensions
-  await page.setViewport({
-    width: 1200,
-    height: 630,
-    deviceScaleFactor: 2, // For better quality
-  });
+  try {
+    console.log('Launching browser...');
+    browser = await puppeteer.launch({
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    console.log('Creating new page...');
+    const page = await browser.newPage();
+    
+    console.log('Setting viewport...');
+    await page.setViewport({
+      width: 1200,
+      height: 630,
+      deviceScaleFactor: 2, // For better quality
+    });
 
-  // Load the HTML file
-  const htmlPath = path.join(__dirname, '../public/og-preview.html');
-  await page.goto(`file://${htmlPath}`);
+    const htmlPath = path.join(__dirname, '../public/og-preview.html');
+    console.log('Loading HTML file from:', htmlPath);
+    
+    const fileUrl = `file://${htmlPath}`;
+    console.log('Navigating to:', fileUrl);
+    await page.goto(fileUrl, { waitUntil: 'networkidle0' });
 
-  // Wait for any animations/fonts to load
-  await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Waiting for fonts and animations...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-  // Take screenshot
-  await page.screenshot({
-    path: path.join(__dirname, '../public/og-preview.png'),
-    type: 'png',
-  });
+    const screenshotPath = path.join(__dirname, '../public/og-preview.png');
+    console.log('Taking screenshot to:', screenshotPath);
+    await page.screenshot({
+      path: screenshotPath,
+      type: 'png',
+      fullPage: true
+    });
 
-  await browser.close();
-  console.log('OG preview image generated successfully!');
+    console.log('OG preview image generated successfully!');
+  } catch (error) {
+    console.error('Error generating OG image:', error);
+    throw error;
+  } finally {
+    if (browser) {
+      console.log('Closing browser...');
+      await browser.close();
+    }
+  }
 }
 
-generateOGImage().catch(console.error); 
+console.log('Script started');
+generateOGImage().catch(error => {
+  console.error('Fatal error:', error);
+  process.exit(1);
+}); 
