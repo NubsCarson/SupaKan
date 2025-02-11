@@ -203,16 +203,18 @@ BEGIN
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Welcome to Kanban Board!',
-            'Welcome to your new Kanban board! Here are some tips to help you get started:
-
-- Drag and drop tasks between columns to update their status
-- Click the "New Task" button to create your own tasks
-- Use the rich text editor to format task descriptions
-- Try the chat panel to collaborate with your team',
-            'backlog', 'high', _position,
+            '👋 Welcome to Kanban Board!',
+            E'<h3>Getting Started Guide</h3>\n' ||
+            E'<p>Welcome to your new Kanban board! Here are some tips to help you get started:</p>\n' ||
+            E'<ul>\n' ||
+            E'  <li>Drag and drop tasks between columns to update their status</li>\n' ||
+            E'  <li>Click the "New Task" button to create your own tasks</li>\n' ||
+            E'  <li>Use the rich text editor to format task descriptions</li>\n' ||
+            E'  <li>Try the chat panel to collaborate with your team</li>\n' ||
+            E'</ul>',
+            'todo', 'high', _position,
             'TASK-001', _board_id, _team_id, NEW.id,
-            ARRAY['getting started', 'documentation']
+            ARRAY['getting-started', 'documentation']
         );
 
         -- Todo
@@ -222,16 +224,19 @@ BEGIN
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Chat System Overview',
-            'Real-time team communication features:
-
-- Pin important messages
-- Like and reply to messages
-- Mention team members using @username
-- Link messages to specific tasks',
-            'todo', 'low', _position,
+            '📝 Task Management Features',
+            E'<h3>Key Features</h3>\n' ||
+            E'<ul>\n' ||
+            E'  <li>Set priority levels (low, medium, high)</li>\n' ||
+            E'  <li>Add due dates and time estimates</li>\n' ||
+            E'  <li>Assign tasks to team members</li>\n' ||
+            E'  <li>Add labels for organization</li>\n' ||
+            E'  <li>Track task progress across columns</li>\n' ||
+            E'</ul>\n' ||
+            E'<p>Try editing this task to explore these features!</p>',
+            'in_progress', 'medium', _position,
             'TASK-002', _board_id, _team_id, NEW.id,
-            ARRAY['chat', 'collaboration']
+            ARRAY['features', 'tutorial']
         );
 
         -- In Progress
@@ -241,19 +246,19 @@ BEGIN
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Task Management Features',
-            'Key Features:
-
-- Set priority levels (low, medium, high)
-- Add due dates and time estimates
-- Assign tasks to team members
-- Add labels for organization
-- Track task progress across columns
-
-Try editing this task to explore these features!',
-            'in_progress', 'medium', _position,
+            '💬 Chat System Overview',
+            E'<h3>Chat Features</h3>\n' ||
+            E'<ul>\n' ||
+            E'  <li>Real-time team communication</li>\n' ||
+            E'  <li>Pin important messages</li>\n' ||
+            E'  <li>Like and reply to messages</li>\n' ||
+            E'  <li>Mention team members using @username</li>\n' ||
+            E'  <li>Link messages to specific tasks</li>\n' ||
+            E'</ul>\n' ||
+            E'<p>Try using the chat panel on the right to communicate with your team!</p>',
+            'backlog', 'low', _position,
             'TASK-003', _board_id, _team_id, NEW.id,
-            ARRAY['features', 'tutorial']
+            ARRAY['chat', 'collaboration']
         );
 
         -- In Review
@@ -263,14 +268,15 @@ Try editing this task to explore these features!',
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Monitor & Database Tools',
-            'Check out these powerful tools:
-
-- System Monitor: Real-time metrics and activity logs
-- Database Explorer: View data structure and sample records
-
-Click the icons in the top navigation to explore these features!',
-            'in_review', 'medium', _position,
+            '📊 Monitor & Database Tools',
+            E'<h3>Advanced Features</h3>\n' ||
+            E'<p>Check out these powerful tools:</p>\n' ||
+            E'<ul>\n' ||
+            E'  <li><strong>System Monitor:</strong> Real-time metrics and activity logs</li>\n' ||
+            E'  <li><strong>Database Explorer:</strong> View data structure and sample records</li>\n' ||
+            E'</ul>\n' ||
+            E'<p>Click the icons in the top navigation to explore these features!</p>',
+            'todo', 'medium', _position,
             'TASK-004', _board_id, _team_id, NEW.id,
             ARRAY['tools', 'advanced']
         );
@@ -282,16 +288,17 @@ Click the icons in the top navigation to explore these features!',
             ticket_id, board_id, team_id, created_by,
             labels
         ) VALUES (
-            'Try Creating a New Task',
-            'Ready to add your own task? Here''s how:
-
-1. Click the "New Task" button at the top
-2. Fill in the task details
-3. Use the rich text editor for formatting
-4. Set priority, due date, and time estimate
-5. Add labels for organization
-
-Give it a try now!',
+            '✨ Try Creating a New Task',
+            E'<h3>Create Your First Task</h3>\n' ||
+            E'<p>Ready to add your own task? Here''s how:</p>\n' ||
+            E'<ol>\n' ||
+            E'  <li>Click the "New Task" button at the top</li>\n' ||
+            E'  <li>Fill in the task details</li>\n' ||
+            E'  <li>Use the rich text editor for formatting</li>\n' ||
+            E'  <li>Set priority, due date, and time estimate</li>\n' ||
+            E'  <li>Add labels for organization</li>\n' ||
+            E'</ol>\n' ||
+            E'<p>Give it a try now!</p>',
             'done', 'low', _position,
             'TASK-005', _board_id, _team_id, NEW.id,
             ARRAY['example', 'tutorial']
@@ -328,7 +335,7 @@ Give it a try now!',
             user_id,
             is_pinned
         ) VALUES (
-            '👥 Try mentioning team members using @username or linking to tasks using their ticket IDs (e.g., TASK-0001)',
+            '🔍 Try mentioning team members using @username or linking to tasks using their ticket IDs (e.g., TASK-001)',
             _team_id,
             NEW.id,
             false
