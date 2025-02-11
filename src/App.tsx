@@ -81,7 +81,7 @@ function Layout() {
               <a
                 target="_blank"
                 rel="noreferrer"
-                href="https://github.com/nubs4dayz/kanbann"
+                href="https://github.com/NubsCarson/SupaKan"
                 className={cn(
                   "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors",
                   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2",
