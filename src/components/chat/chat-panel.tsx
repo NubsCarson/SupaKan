@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent, useCallback } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
@@ -45,12 +45,42 @@ export function ChatPanel() {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [isNearBottom, setIsNearBottom] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // Function to check if scroll is near bottom
+  const checkIfNearBottom = useCallback(() => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const threshold = 100; // pixels from bottom
+    const position = scrollArea.scrollTop + scrollArea.clientHeight;
+    const nearBottom = position >= scrollArea.scrollHeight - threshold;
+    setIsNearBottom(nearBottom);
+  }, []);
+
+  // Smart scroll to bottom
+  const scrollToBottom = useCallback((force = false) => {
+    if (force || isNearBottom) {
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      });
+    }
+  }, [isNearBottom]);
+
+  // Handle scroll events
+  useEffect(() => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const handleScroll = () => {
+      checkIfNearBottom();
+    };
+
+    scrollArea.addEventListener('scroll', handleScroll);
+    return () => scrollArea.removeEventListener('scroll', handleScroll);
+  }, [checkIfNearBottom]);
 
   // Load initial team and messages
   useEffect(() => {
@@ -73,6 +103,8 @@ export function ChatPanel() {
           if (error) throw error;
           setMessages(data || []);
           setPinnedMessages(data?.filter(m => m.is_pinned) || []);
+          // Force scroll to bottom on initial load
+          setTimeout(() => scrollToBottom(true), 100);
         }
       } catch (error) {
         console.error('Error loading team and messages:', error);
@@ -87,7 +119,7 @@ export function ChatPanel() {
     };
 
     loadTeamAndMessages();
-  }, [user]);
+  }, [user, scrollToBottom]);
 
   // Set up real-time subscription
   useEffect(() => {
@@ -107,10 +139,10 @@ export function ChatPanel() {
 
       setMessages(data || []);
       setPinnedMessages(data?.filter(m => m.is_pinned) || []);
-      setTimeout(scrollToBottom, 100);
+      scrollToBottom();
     };
 
-    // Subscribe to messages for the team
+    // Subscribe to both messages table and messages_with_users view
     const channel = supabase
       .channel(`messages:${teamId}`)
       .on(
@@ -121,17 +153,36 @@ export function ChatPanel() {
           table: 'messages',
           filter: `team_id=eq.${teamId}`,
         },
-        async () => {
-          // Reload messages on any change
+        async (payload) => {
+          console.log('Message change:', payload);
           await loadMessages();
         }
       )
-      .subscribe();
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages_with_users',
+          filter: `team_id=eq.${teamId}`,
+        },
+        async (payload) => {
+          console.log('Messages with users change:', payload);
+          await loadMessages();
+        }
+      )
+      .subscribe((status) => {
+        console.log('Subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('Successfully subscribed to real-time updates');
+        }
+      });
 
     // Load initial messages
     loadMessages();
 
     return () => {
+      console.log('Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   }, [teamId, scrollToBottom]);
@@ -145,7 +196,8 @@ export function ChatPanel() {
     setNewMessage('');
 
     try {
-      const { error } = await supabase
+      // First, insert the message
+      const { data: newMessage, error: insertError } = await supabase
         .from('messages')
         .insert({
           content,
@@ -154,9 +206,24 @@ export function ChatPanel() {
           likes: [],
           is_pinned: false,
           mentions: [],
-        });
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Then, fetch the complete message with user data
+      const { data: messageWithUser, error: fetchError } = await supabase
+        .from('messages_with_users')
+        .select('*')
+        .eq('id', newMessage.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update the UI optimistically
+      setMessages(prev => [...prev, messageWithUser]);
+      scrollToBottom(true);
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -370,7 +437,12 @@ export function ChatPanel() {
         </div>
       )}
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea 
+        ref={scrollAreaRef}
+        className="flex-1 p-4"
+        onWheel={checkIfNearBottom}
+        onTouchMove={checkIfNearBottom}
+      >
         <div className="space-y-4">
           {messages.map(message => (
             <div
