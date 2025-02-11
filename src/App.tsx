@@ -227,8 +227,8 @@ export default function App() {
   return (
     <AuthProvider>
       <RouterProvider router={router} />
-      <Analytics />
-      <SpeedInsights />
+      <Analytics debug={true} />
+      <SpeedInsights debug={true} />
       <Toaster />
     </AuthProvider>
   );
