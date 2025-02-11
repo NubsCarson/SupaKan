@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
+import { getTasks, updateTask, updateTaskPositions } from '@/lib/boards';
 
 type Task = Database['public']['Tables']['tasks']['Row'];
 type TaskStatus = Task['status'];
@@ -46,14 +47,8 @@ export function Board() {
 
   const loadTasks = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('position');
-
-      if (error) throw error;
-      
-      setTasks(data as Task[]);
+      const tasks = await getTasks();
+      setTasks(tasks);
       setIsLoading(false);
     } catch (error) {
       console.error('Failed to load tasks:', error);
@@ -145,7 +140,7 @@ export function Board() {
           }
           return task;
         });
-      } 
+      }
       // Moving between columns
       else {
         // Remove from source column
@@ -196,24 +191,26 @@ export function Board() {
       // Update state immediately for smooth animation
       setTasks(updatedTasks);
 
-      // Persist all position changes
-      const { error } = await supabase
-        .from('tasks')
-        .upsert(
-          updatedTasks
-            .filter(t => 
-              t.id === draggableId || 
-              t.status === source.droppableId || 
-              t.status === destination.droppableId
-            )
-            .map(({ id, status, position }) => ({
-              id,
-              status,
-              position,
-            }))
-        );
+      // First update the status if it changed
+      if (source.droppableId !== destination.droppableId) {
+        await updateTask(draggableId, { 
+          status: destination.droppableId as TaskStatus 
+        });
+      }
 
-      if (error) throw error;
+      // Then update all positions atomically
+      const taskPositions = updatedTasks
+        .filter(t => 
+          t.id === draggableId || 
+          t.status === source.droppableId || 
+          t.status === destination.droppableId
+        )
+        .map(({ id, position }) => ({
+          id,
+          position
+        }));
+
+      await updateTaskPositions(taskPositions);
 
       // Show success toast
       toast({
@@ -316,14 +313,15 @@ export function Board() {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={cn(
-                          "flex-1 overflow-y-auto p-2 transition-colors duration-200",
+                          "flex-1 p-2 transition-colors duration-200",
                           "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-muted",
                           "hover:scrollbar-thumb-muted-foreground/50",
                           snapshot.isDraggingOver && "bg-muted/50 ring-2 ring-primary/20"
                         )}
                         style={{
                           minHeight: "100px",
-                          maxHeight: "calc(100vh - 12rem)"
+                          maxHeight: "calc(100vh - 12rem)",
+                          overflowY: "auto"
                         }}
                       >
                         <Column
@@ -393,6 +391,8 @@ export function Board() {
         onOpenChange={setIsTaskDialogOpen}
         task={selectedTask}
         onTaskSaved={loadTasks}
+        boardId={tasks[0]?.board_id}
+        teamId={tasks[0]?.team_id}
       />
     </div>
   );

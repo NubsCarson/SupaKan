@@ -55,16 +55,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (!user) return;
 
-      // Simple workspace check
-      const { data: workspace } = await supabase
+      // Check for existing team (either as owner or member)
+      const { data: teams, error: teamsError } = await supabase
         .from('teams')
         .select('id')
-        .eq('created_by', user.id)
+        .or(`created_by.eq.${user.id},team_members.user_id.eq.${user.id}`)
         .limit(1)
         .single();
-        
-      if (!workspace) {
-        await initializeWorkspace(user.id);
+
+      if (teamsError && teamsError.code !== 'PGRST116') {
+        console.error('Error checking teams:', teamsError);
+      }
+
+      // If no team exists, create one
+      if (!teams) {
+        const { error: createError } = await supabase
+          .from('teams')
+          .insert({
+            name: 'My Team',
+            created_by: user.id
+          });
+
+        if (createError) {
+          console.error('Error creating team:', createError);
+          toast({
+            title: 'Error',
+            description: 'Failed to create team. Please try again.',
+            variant: 'destructive',
+          });
+        }
       }
     } catch (error) {
       console.warn('Auth initialization error:', error);

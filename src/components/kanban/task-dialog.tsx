@@ -19,9 +19,18 @@ interface TaskDialogProps {
   onOpenChange: (open: boolean) => void;
   task: Task | null;
   onTaskSaved: () => void;
+  boardId?: string;
+  teamId?: string;
 }
 
-export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialogProps) {
+export function TaskDialog({ 
+  open, 
+  onOpenChange, 
+  task, 
+  onTaskSaved,
+  boardId,
+  teamId 
+}: TaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
@@ -39,6 +48,16 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
     e.preventDefault();
     if (!user) return;
     
+    // Validate required IDs when creating a new task
+    if (!task && (!boardId || !teamId)) {
+      toast({
+        title: 'Error',
+        description: 'Missing board or team information',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -54,8 +73,8 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
         position: task?.position || 0,
         created_by: user.id,
         assigned_to: null,
-        board_id: task?.board_id || '', // You'll need to pass this from parent
-        team_id: task?.team_id || '', // You'll need to pass this from parent
+        board_id: task?.board_id || boardId,
+        team_id: task?.team_id || teamId,
         labels: task?.labels || [],
         estimated_hours: task?.estimated_hours || null,
       };
