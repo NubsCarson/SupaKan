@@ -13,16 +13,32 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { SystemDashboard } from '@/components/system-dashboard';
+import AuthCallback from '@/routes/auth/callback';
+
+function LoadingSpinner() {
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+        <p className="text-sm text-muted-foreground">Loading your workspace...</p>
+      </div>
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!loading && !isAuthenticated) {
       setShowAuth(true);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loading]);
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   if (!isAuthenticated) {
     return <AuthDialog open={showAuth} onOpenChange={setShowAuth} />;
@@ -32,81 +48,52 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function Layout() {
-  const { user, setUser } = useAuth();
-  const [showAuth, setShowAuth] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
+      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-14 max-w-screen-2xl items-center">
           <div className="mr-4 flex">
-            <Link className="mr-6 flex items-center space-x-2" to="/">
-              <span className="font-bold sm:inline-block">Kanban</span>
+            <Link to="/" className="mr-6 flex items-center space-x-2">
+              <span className="font-bold sm:inline-block">Kanbann</span>
             </Link>
-            <nav className="flex items-center space-x-6 text-sm font-medium">
-              <Link
-                to="/"
-                className={cn(
-                  'transition-colors hover:text-foreground/80',
-                  'text-foreground'
-                )}
-              >
-                Board
-              </Link>
-              <Link
-                to="/dashboard"
-                className={cn(
-                  'transition-colors hover:text-foreground/80',
-                  'text-foreground/60'
-                )}
-              >
-                <Gauge className="h-5 w-5" />
-              </Link>
-            </nav>
+            {isAuthenticated && (
+              <nav className="flex items-center space-x-6 text-sm font-medium">
+                <Link to="/" className="transition-colors hover:text-foreground/80">Board</Link>
+                <Link to="/dashboard" className="transition-colors hover:text-foreground/80">Dashboard</Link>
+              </nav>
+            )}
           </div>
           <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-            <div className="w-full flex-1 md:w-auto md:flex-none">
-              {/* Add search or other controls here */}
-            </div>
-            <nav className="flex items-center space-x-2">
+            <div className="flex items-center gap-2">
               <a
-                href="https://github.com/NubsCarson/kanban"
                 target="_blank"
                 rel="noreferrer"
+                href="https://github.com/nubs4dayz/kanbann"
+                className={cn(
+                  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "disabled:pointer-events-none disabled:opacity-50",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  "h-9 px-3"
+                )}
               >
-                <Button variant="ghost" size="icon">
-                  <Github className="h-5 w-5" />
-                </Button>
+                <Github className="h-4 w-4" />
               </a>
               <ModeToggle />
-              {user ? (
-                <Button
-                  variant="ghost"
-                  onClick={() => setUser(null)}
-                >
-                  Sign Out
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowAuth(true)}
-                >
-                  Sign In
-                </Button>
-              )}
-            </nav>
+            </div>
           </div>
         </div>
       </header>
-
       <main className="flex-1">
         <Outlet />
       </main>
-
       <Footer />
-
-      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
-      <Toaster />
     </div>
   );
 }
@@ -116,9 +103,16 @@ const router = createBrowserRouter(
     <Route path="/*" element={<Layout />}>
       <Route index element={<ProtectedRoute><Board /></ProtectedRoute>} />
       <Route path="dashboard" element={<ProtectedRoute><SystemDashboard /></ProtectedRoute>} />
+      <Route path="auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
-  )
+  ),
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true
+    }
+  }
 );
 
 export default function App() {

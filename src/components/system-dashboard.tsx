@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { dbService } from '@/lib/db';
-import type { Task, ChatMessage } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
 import { Link } from 'react-router-dom';
 import { 
   Activity, ArrowLeft, BarChart3, CheckCircle2, Clock, ListTodo, 
-  MessageSquare, Users, AlertTriangle, Loader2, Database, Table, 
+  MessageSquare, Users, AlertTriangle, Loader2, Database as DatabaseIcon, Table, 
   Shield, LayoutGrid, List, RefreshCcw, Eye, Code, Gauge, Server,
   Calendar, CheckCircle, XCircle, Clock4, Settings, LineChart,
   PieChart, Timer, Zap, Bell, Filter, Search, FileJson, Terminal
@@ -18,6 +18,10 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
+import { toast } from '@/components/ui/use-toast';
+
+type Task = Database['public']['Tables']['tasks']['Row'];
+type Message = Database['public']['Tables']['messages']['Row'];
 
 interface SystemMetrics {
   total: number;
@@ -52,7 +56,7 @@ export function SystemDashboard() {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [dbStats, setDbStats] = useState<DBStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
@@ -64,13 +68,42 @@ export function SystemDashboard() {
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(30000);
 
+  const calculatePerformanceMetrics = (tasks: Task[]) => {
+    const completedTasks = tasks.filter(t => t.status === 'done');
+    const avgTime = completedTasks.length > 0
+      ? completedTasks.reduce((acc, task) => {
+          const completionTime = new Date(task.updated_at).getTime() - new Date(task.created_at).getTime();
+          return acc + completionTime;
+        }, 0) / completedTasks.length / (1000 * 60 * 60 * 24) // Convert to days
+      : 0;
+
+    const statusCount = tasks.reduce((acc, task) => {
+      acc[task.status] = (acc[task.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    setPerformanceMetrics({
+      avgCompletionTime: avgTime,
+      tasksByPriority: {
+        high: tasks.filter(t => t.priority === 'high').length,
+        medium: tasks.filter(t => t.priority === 'medium').length,
+        low: tasks.filter(t => t.priority === 'low').length
+      },
+      tasksByStatus: statusCount
+    });
+  };
+
   async function loadAllData() {
     try {
       setRefreshing(true);
-      const [fetchedTasks, fetchedMessages] = await Promise.all([
-        dbService.getTasks(),
-        dbService.getMessages(),
+      const [{ data: fetchedTasks, error: tasksError }, { data: fetchedMessages, error: messagesError }] = await Promise.all([
+        supabase.from('tasks').select('*').order('created_at'),
+        supabase.from('messages').select('*').order('created_at'),
       ]);
+
+      if (tasksError) throw tasksError;
+      if (messagesError) throw messagesError;
+      if (!fetchedTasks || !fetchedMessages) throw new Error('Failed to fetch data');
 
       setTasks(fetchedTasks);
       setMessages(fetchedMessages);
@@ -112,41 +145,61 @@ export function SystemDashboard() {
       setRefreshing(false);
     } catch (error) {
       console.error('Failed to load data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load data. Please try refreshing the page.',
+        variant: 'destructive',
+      });
       setIsLoading(false);
       setRefreshing(false);
     }
   }
 
-  // Add new function to calculate performance metrics
-  const calculatePerformanceMetrics = (tasks: Task[]) => {
-    const completedTasks = tasks.filter(t => t.status === 'done');
-    const avgTime = completedTasks.length > 0
-      ? completedTasks.reduce((acc, task) => {
-          const completionTime = new Date(task.updated_at).getTime() - new Date(task.created_at).getTime();
-          return acc + completionTime;
-        }, 0) / completedTasks.length / (1000 * 60 * 60 * 24) // Convert to days
-      : 0;
-
-    const statusCount = tasks.reduce((acc, task) => {
-      acc[task.status] = (acc[task.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    setPerformanceMetrics({
-      avgCompletionTime: avgTime,
-      tasksByPriority: {
-        high: tasks.filter(t => t.priority === 'high').length,
-        medium: tasks.filter(t => t.priority === 'medium').length,
-        low: tasks.filter(t => t.priority === 'low').length
-      },
-      tasksByStatus: statusCount
-    });
+  const sortMessages = (messages: Message[]) => {
+    return [...messages].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
   };
 
   useEffect(() => {
     loadAllData();
+
+    // Subscribe to changes
+    const tasksChannel = supabase
+      .channel('tasks')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tasks' 
+        }, 
+        () => {
+          loadAllData();
+        }
+      )
+      .subscribe();
+
+    const messagesChannel = supabase
+      .channel('messages')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'messages' 
+        }, 
+        () => {
+          loadAllData();
+        }
+      )
+      .subscribe();
+
     const interval = setInterval(loadAllData, refreshInterval);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearInterval(interval);
+      tasksChannel.unsubscribe();
+      messagesChannel.unsubscribe();
+    };
   }, [refreshInterval]);
 
   useEffect(() => {
@@ -154,6 +207,55 @@ export function SystemDashboard() {
       calculatePerformanceMetrics(tasks);
     }
   }, [tasks]);
+
+  const exportData = async () => {
+    try {
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at');
+
+      if (messagesError) throw messagesError;
+
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at');
+
+      if (tasksError) throw tasksError;
+
+      const data = {
+        tasks,
+        messages,
+        exportedAt: new Date().toISOString(),
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kanban-export-${format(new Date(), 'yyyy-MM-dd')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export successful',
+        description: 'Your data has been exported successfully.',
+      });
+    } catch (error) {
+      console.error('Failed to export data:', error);
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export data. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -380,7 +482,7 @@ export function SystemDashboard() {
                       <div className="space-y-1">
                         <p className="text-sm">{message.content}</p>
                         <p className="text-xs text-muted-foreground">
-                          Sent {format(new Date(message.timestamp), 'MMM dd, HH:mm')}
+                          Sent {format(new Date(message.created_at), 'MMM dd, HH:mm')}
                         </p>
                       </div>
                     </div>
@@ -393,155 +495,165 @@ export function SystemDashboard() {
 
         {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Task Distribution</CardTitle>
-              <CardDescription>Analysis of task status and priorities</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <h3 className="text-sm font-medium mb-4">Tasks by Status</h3>
-                  <div className="space-y-2">
-                    {Object.entries(performanceMetrics.tasksByStatus).map(([status, count]) => (
-                      <div key={status} className="flex items-center justify-between">
-                        <span className="text-sm capitalize">{status.replace('_', ' ')}</span>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={(count / tasks.length) * 100} 
-                            className="w-24"
-                          />
-                          <span className="text-sm font-medium">{count}</span>
-                        </div>
-                      </div>
-                    ))}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Task Completion Rate</CardTitle>
+                <CardDescription>
+                  Percentage of tasks completed over time
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px] w-full">
+                  {/* Add chart here */}
+                  <div className="flex h-full items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <BarChart3 className="mx-auto h-12 w-12 opacity-50" />
+                      <p className="mt-2">Chart coming soon</p>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium mb-4">Tasks by Priority</h3>
-                  <div className="space-y-2">
-                    {Object.entries(performanceMetrics.tasksByPriority).map(([priority, count]) => (
-                      <div key={priority} className="flex items-center justify-between">
-                        <span className="text-sm capitalize">{priority}</span>
-                        <div className="flex items-center gap-2">
-                          <Progress 
-                            value={(count / tasks.length) * 100} 
-                            className="w-24"
-                          />
-                          <span className="text-sm font-medium">{count}</span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Task Distribution</CardTitle>
+                <CardDescription>
+                  Distribution of tasks by status and priority
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="mb-2 text-sm font-medium">By Status</h4>
+                    <div className="grid gap-2">
+                      {Object.entries(performanceMetrics.tasksByStatus).map(([status, count]) => (
+                        <div key={status} className="flex items-center gap-2">
+                          <div className="w-48">
+                            <div className="text-sm">{status}</div>
+                            <Progress value={(count / tasks.length) * 100} />
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {count} tasks ({Math.round((count / tasks.length) * 100)}%)
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="mb-2 text-sm font-medium">By Priority</h4>
+                    <div className="grid gap-2">
+                      {Object.entries(performanceMetrics.tasksByPriority).map(([priority, count]) => (
+                        <div key={priority} className="flex items-center gap-2">
+                          <div className="w-48">
+                            <div className="text-sm">{priority}</div>
+                            <Progress value={(count / tasks.length) * 100} />
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {count} tasks ({Math.round((count / tasks.length) * 100)}%)
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Raw Data Tab */}
         <TabsContent value="raw" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Raw Database Data</CardTitle>
-              <CardDescription>View and inspect raw data from the database</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="tasks" className="space-y-4">
-                <TabsList>
-                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
-                  <TabsTrigger value="messages">Messages</TabsTrigger>
-                </TabsList>
-                <TabsContent value="tasks">
-                  <ScrollArea className="h-[500px] w-full rounded-md border p-4">
-                    <pre className="text-sm">
-                      {JSON.stringify(tasks, null, 2)}
-                    </pre>
-                  </ScrollArea>
-                </TabsContent>
-                <TabsContent value="messages">
-                  <ScrollArea className="h-[500px] w-full rounded-md border p-4">
-                    <pre className="text-sm">
-                      {JSON.stringify(messages, null, 2)}
-                    </pre>
-                  </ScrollArea>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tasks</CardTitle>
+                <CardDescription>
+                  Raw task data from the database
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <pre className="text-xs">
+                    {JSON.stringify(tasks, null, 2)}
+                  </pre>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Messages</CardTitle>
+                <CardDescription>
+                  Raw message data from the database
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[400px]">
+                  <pre className="text-xs">
+                    {JSON.stringify(messages, null, 2)}
+                  </pre>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Developer Tab */}
         <TabsContent value="developer" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Database Information</CardTitle>
-              <CardDescription>Technical details about the IndexedDB database</CardDescription>
+              <CardTitle>System Information</CardTitle>
+              <CardDescription>
+                Technical details about the system
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Database Name</h3>
-                    <p className="text-sm text-muted-foreground">kanban_db</p>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Object Stores</h3>
-                    <ul className="list-disc list-inside text-sm text-muted-foreground">
-                      <li>tasks</li>
-                      <li>messages</li>
-                    </ul>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Total Records</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {tasks.length + messages.length} ({tasks.length} tasks, {messages.length} messages)
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Last Sync</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(), 'MMM dd, yyyy HH:mm:ss')}
-                    </p>
+              <div className="grid gap-4">
+                <div>
+                  <h4 className="mb-2 text-sm font-medium">Database Statistics</h4>
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Tasks</span>
+                      <span className="font-mono text-sm">{dbStats?.taskCount || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Messages</span>
+                      <span className="font-mono text-sm">{dbStats?.messageCount || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Completion Rate</span>
+                      <span className="font-mono text-sm">
+                        {dbStats?.completionRate.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Average Task Age</span>
+                      <span className="font-mono text-sm">
+                        {dbStats?.avgTaskAge.toFixed(1)} days
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">Database Schema</h3>
-                  <pre className="text-sm bg-muted p-4 rounded-md">
-{`{
-  "tasks": {
-    "keyPath": "id",
-    "indexes": ["status", "created_at", "updated_at"]
-  },
-  "messages": {
-    "keyPath": "id",
-    "indexes": ["timestamp"]
-  }
-}`}
-                  </pre>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Metrics</CardTitle>
-              <CardDescription>Real-time system performance data</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Average Query Time</span>
-                  <span className="text-sm font-medium">
-                    {performanceMetrics.avgCompletionTime.toFixed(2)}ms
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Data Size</span>
-                  <span className="text-sm font-medium">
-                    {(new TextEncoder().encode(JSON.stringify({ tasks, messages })).length / 1024).toFixed(2)} KB
-                  </span>
+                <div>
+                  <h4 className="mb-2 text-sm font-medium">Actions</h4>
+                  <div className="grid gap-2">
+                    <Button
+                      variant="outline" 
+                      className="w-full"
+                      onClick={exportData}
+                    >
+                      <DatabaseIcon className="mr-2 h-4 w-4" />
+                      Export Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setRefreshInterval(prev => prev === 5000 ? 30000 : 5000)}
+                    >
+                      <RefreshCcw className="mr-2 h-4 w-4" />
+                      {refreshInterval === 5000 ? 'Slow Refresh (30s)' : 'Fast Refresh (5s)'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -580,20 +692,9 @@ export function SystemDashboard() {
               <Button 
                 variant="outline" 
                 className="w-full"
-                onClick={() => {
-                  const dataStr = JSON.stringify({ tasks, messages }, null, 2);
-                  const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                  const url = URL.createObjectURL(dataBlob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `kanban-export-${format(new Date(), 'yyyy-MM-dd-HH-mm')}.json`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                }}
+                onClick={exportData}
               >
-                <Database className="mr-2 h-4 w-4" />
+                <DatabaseIcon className="mr-2 h-4 w-4" />
                 Export Data
               </Button>
             </CardContent>

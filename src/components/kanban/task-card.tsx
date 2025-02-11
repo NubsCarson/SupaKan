@@ -21,9 +21,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { TaskDialog } from './task-dialog';
-import type { Task } from '@/lib/types';
-import { dbService } from '@/lib/db';
+import type { Database } from '@/lib/database.types';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
+
+type Task = Database['public']['Tables']['tasks']['Row'];
 
 interface TaskCardProps {
   task: Task;
@@ -40,13 +43,34 @@ const priorityColors = {
 function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleDelete() {
     try {
-      await dbService.deleteTask(task.id);
+      setIsDeleting(true);
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', task.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Task deleted',
+        description: 'The task has been deleted successfully.',
+      });
+
       onTaskUpdated();
     } catch (error) {
       console.error('Failed to delete task:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete task',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
     }
   }
 
@@ -176,7 +200,7 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
         task={task}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onTaskUpdated={onTaskUpdated}
+        onTaskSaved={onTaskUpdated}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -189,12 +213,13 @@ function TaskCardComponent({ task, index, onTaskUpdated }: TaskCardProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

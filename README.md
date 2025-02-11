@@ -1,95 +1,101 @@
-# Kanban Board
+# SupaKan - Supabase-Powered Kanban Board
 
-A modern, feature-rich Kanban board application built with React and TypeScript. Experience seamless task management with real-time chat, powerful analytics, and a beautiful dark mode interface.
+A modern, real-time Kanban board application built with React, TypeScript, and Supabase. Features include team collaboration, real-time updates, and a built-in chat system.
 
-![Kanban Board Preview](public/og-preview.png)
+## Features
 
-## ✨ Features
+- 📋 Drag-and-drop Kanban board
+- 💬 Real-time team chat
+- 🔄 Real-time updates across all components
+- 👥 Team collaboration
+- 📌 Message pinning and reactions
+- 🎨 Modern UI with dark mode support
+- 🔒 Secure authentication with Supabase
 
-### Task Management
-- 📋 Intuitive drag-and-drop task management across columns (Backlog, Todo, In Progress, In Review, Done)
-- 📝 Rich text editor with formatting, mentions, and file attachments
-- 🏷️ Customizable task labels and priority levels
-- 📅 Due dates and time estimation tracking
-- 🎫 Automatic ticket ID generation for easy reference
-- 🔍 Advanced task filtering and search capabilities
+## Tech Stack
 
-### Team Collaboration
-- 💬 Real-time chat with message threading
-- 👥 @mentions and notifications
-- 📌 Pin important messages
-- 👍 Message reactions and likes
-- 🔗 Link tasks in conversations
+- **Frontend:**
+  - React
+  - TypeScript
+  - Tailwind CSS
+  - Shadcn/ui
+  - React Beautiful DND
 
-### Analytics & Monitoring
-- 📊 Real-time task distribution analytics
-- ⏱️ Task completion time tracking
-- 📈 Team productivity metrics
-- 🔄 System health monitoring
-- 💡 Insights dashboard
+- **Backend:**
+  - Supabase (Database, Auth, Real-time)
 
-### Modern UI/UX
-- 🌓 Beautiful dark/light mode with system preference sync
-- 🎨 Modern design using Tailwind CSS and shadcn/ui
-- 📱 Fully responsive layout
-- ⚡ Fast and smooth animations
-- 🖼️ Social media preview cards
+## Getting Started
 
-## 🛠️ Tech Stack
+### Prerequisites
 
-- **Frontend Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS + shadcn/ui
-- **State Management**: React Context + Custom Hooks
-- **Data Storage**: IndexedDB
-- **Rich Text Editor**: TipTap
-- **Drag and Drop**: react-beautiful-dnd
-- **Routing**: React Router DOM
-- **Form Handling**: React Hook Form + Zod
-- **Icons**: Lucide React
-- **Date Handling**: date-fns
+- Node.js (v16 or higher)
+- npm or yarn
+- Supabase account
 
-## 🚀 Getting Started
+### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/NubsCarson/kanban.git
-   cd kanban
+   git clone https://github.com/NubsCarson/SupaKan.git
+   cd SupaKan
    ```
 
 2. Install dependencies:
    ```bash
    npm install
+   # or
+   yarn install
    ```
 
-3. Start the development server:
+3. Create a `.env` file in the root directory and add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+4. Start the development server:
    ```bash
    npm run dev
+   # or
+   yarn dev
    ```
 
-4. Open [http://localhost:5173](http://localhost:5173) in your browser.
+### Database Setup
 
-## 📖 Usage
+1. Create a new Supabase project
+2. Run the migration scripts in the `supabase/migrations` folder
+3. Enable real-time functionality for the required tables
 
-### Task Management
-- Create tasks with rich descriptions, due dates, and priorities
-- Drag and drop tasks between columns to update status
-- Use the rich text editor to add formatted content, lists, and code blocks
-- Attach labels for better organization
-- Set time estimates and track progress
+## Project Structure
 
-### Chat System
-- Start conversations in the chat panel
-- @mention team members to notify them
-- Pin important messages for quick access
-- React to messages with likes
-- Link tasks in conversations for context
+```
+src/
+├── components/        # React components
+│   ├── kanban/       # Kanban board components
+│   ├── chat/         # Chat components
+│   └── ui/           # Shared UI components
+├── lib/              # Utilities and helpers
+├── hooks/            # Custom React hooks
+└── types/            # TypeScript type definitions
+```
 
-### Analytics
-- Monitor task distribution across columns
-- Track completion rates and team performance
-- View system health metrics
-- Analyze chat engagement statistics
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [Supabase](https://supabase.io/) for the amazing backend platform
+- [Shadcn/ui](https://ui.shadcn.com/) for the beautiful UI components
+- [React Beautiful DND](https://github.com/atlassian/react-beautiful-dnd) for the drag-and-drop functionality
 
 ## 🛠️ Development
 

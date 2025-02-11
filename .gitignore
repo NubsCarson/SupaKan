@@ -1,16 +1,18 @@
-# dependencies
+# Dependencies
 node_modules
 .pnp
 .pnp.js
 
-# testing
+# Testing
 coverage
 
-# production
+# Production
 build
 dist
+.next
+out
 
-# misc
+# Misc
 .DS_Store
 .env
 .env.local
@@ -18,6 +20,25 @@ dist
 .env.test.local
 .env.production.local
 .env*.local
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Supabase
+.branches
+.temp
 
 # Supabase
 .supabase
@@ -30,15 +51,11 @@ yarn-error.log*
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# TypeScript
-*.tsbuildinfo
 
 # Local database
 *.db
@@ -47,3 +64,4 @@ yarn-error.log*
 reference/
 
 *storybook.log
+refff/

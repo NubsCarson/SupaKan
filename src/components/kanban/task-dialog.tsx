@@ -7,8 +7,12 @@ import { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Editor } from '@/components/ui/editor';
-import { dbService } from '@/lib/db';
-import type { Task } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from '@/components/ui/use-toast';
+
+type Task = Database['public']['Tables']['tasks']['Row'];
 
 interface TaskDialogProps {
   open: boolean;
@@ -19,6 +23,7 @@ interface TaskDialogProps {
 
 export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const editor = useEditor({
     extensions: [StarterKit],
@@ -32,34 +37,66 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!user) return;
+    
     setIsSubmitting(true);
 
     try {
       const formData = new FormData(e.currentTarget);
+      const dueDateValue = formData.get('due_date');
+      
       const data = {
         title: formData.get('title') as string,
         description: editor?.getHTML() || '',
         status: formData.get('status') as Task['status'],
         priority: formData.get('priority') as Task['priority'],
-        due_date: formData.get('due_date') as string || undefined,
+        due_date: dueDateValue ? dueDateValue.toString() : null,
         position: task?.position || 0,
-        created_by: 'user',
+        created_by: user.id,
         assigned_to: null,
-        ticket_id: task?.ticket_id || crypto.randomUUID(),
+        board_id: task?.board_id || '', // You'll need to pass this from parent
+        team_id: task?.team_id || '', // You'll need to pass this from parent
         labels: task?.labels || [],
-        estimated_hours: task?.estimated_hours
+        estimated_hours: task?.estimated_hours || null,
       };
 
       if (task) {
-        await dbService.updateTask(task.id, data);
+        const { error } = await supabase
+          .from('tasks')
+          .update(data)
+          .eq('id', task.id);
+
+        if (error) throw error;
       } else {
-        await dbService.createTask(data);
+        // Generate ticket ID (you might want to move this to a backend function)
+        const { count } = await supabase
+          .from('tasks')
+          .select('*', { count: 'exact', head: true });
+
+        const nextNumber = (count ?? 0) + 1;
+        const ticket_id = `TASK-${nextNumber.toString().padStart(4, '0')}`;
+
+        const { error } = await supabase
+          .from('tasks')
+          .insert({ ...data, ticket_id });
+
+        if (error) throw error;
       }
+
+      toast({
+        title: task ? 'Task updated' : 'Task created',
+        description: task ? 'Your task has been updated.' : 'Your new task has been created.',
+      });
 
       onTaskSaved();
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to save task:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save task',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -140,7 +177,7 @@ export function TaskDialog({ open, onOpenChange, task, onTaskSaved }: TaskDialog
                 id="due_date"
                 name="due_date"
                 className="w-full"
-                defaultValue={task?.due_date}
+                defaultValue={task?.due_date?.split('T')[0]}
               />
             </div>
           </div>

@@ -4,12 +4,28 @@ import { Plus, MessageSquare, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TaskDialog } from './task-dialog';
 import { Column } from './column';
-import { dbService } from '@/lib/db';
-import type { Task } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
 import { ChatPanel } from '@/components/chat/chat-panel';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+
+type Task = Database['public']['Tables']['tasks']['Row'];
+type TaskStatus = Task['status'];
+
+// Transform database task to our Task type
+function transformTask(task: any): Task {
+  return {
+    ...task,
+    due_date: task.due_date || null,
+    description: task.description || null,
+    assigned_to: task.assigned_to || null,
+    estimated_hours: task.estimated_hours || null,
+    labels: task.labels || [],
+  };
+}
 
 const columns = [
   { id: 'backlog', title: 'Backlog', icon: '📋' },
@@ -26,29 +42,50 @@ export function Board() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const { user } = useAuth();
 
   const loadTasks = useCallback(async () => {
     try {
-      const tasks = await dbService.getTasks();
-      setTasks(tasks);
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('position');
+
+      if (error) throw error;
+      
+      setTasks(data as Task[]);
+      setIsLoading(false);
     } catch (error) {
       console.error('Failed to load tasks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load tasks. Please try refreshing the page.',
+        variant: 'destructive',
+      });
     }
   }, []);
 
   useEffect(() => {
-    const initializeDb = async () => {
-      try {
-        await dbService.initialize();
-        await loadTasks();
-      } catch (error) {
-        console.error('Failed to initialize database:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    loadTasks();
 
-    initializeDb();
+    // Subscribe to task changes
+    const channel = supabase
+      .channel('tasks')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tasks' 
+        }, 
+        () => {
+          loadTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
   }, [loadTasks]);
 
   const onDragStart = () => {
@@ -160,20 +197,23 @@ export function Board() {
       setTasks(updatedTasks);
 
       // Persist all position changes
-      await Promise.all(
-        updatedTasks
-          .filter(t => 
-            t.id === draggableId || 
-            t.status === source.droppableId || 
-            t.status === destination.droppableId
-          )
-          .map(task => 
-            dbService.updateTask(task.id, {
-              status: task.status,
-              position: task.position
-            })
-          )
-      );
+      const { error } = await supabase
+        .from('tasks')
+        .upsert(
+          updatedTasks
+            .filter(t => 
+              t.id === draggableId || 
+              t.status === source.droppableId || 
+              t.status === destination.droppableId
+            )
+            .map(({ id, status, position }) => ({
+              id,
+              status,
+              position,
+            }))
+        );
+
+      if (error) throw error;
 
       // Show success toast
       toast({
@@ -317,7 +357,7 @@ export function Board() {
             isChatOpen ? "translate-y-0" : "translate-y-full"
           )}
         >
-          <div className="relative h-[80vh] rounded-t-xl border-t bg-background shadow-lg">
+          <div className="relative h-[70vh] rounded-t-xl border-t bg-background shadow-lg">
             <div className="sticky top-0 flex items-center justify-between border-b bg-background/95 p-2 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <h2 className="text-lg font-semibold">Chat</h2>
               <Button
@@ -328,7 +368,7 @@ export function Board() {
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <div className="h-[calc(80vh-3rem)]">
+            <div className="h-[calc(70vh-3rem)]">
               <ChatPanel />
             </div>
           </div>
@@ -340,7 +380,7 @@ export function Board() {
           size="icon"
           className={cn(
             "fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg xl:hidden",
-            isChatOpen && "translate-y-[-80vh]"
+            isChatOpen && "translate-y-[-70vh]"
           )}
           onClick={() => setIsChatOpen(true)}
         >

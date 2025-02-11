@@ -1,166 +1,206 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { dbService } from '@/lib/db';
-import type { ChatMessage, User } from '@/lib/types';
+import { supabase } from '@/lib/supabase';
+import type { Database } from '@/lib/database.types';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { getUserTeams } from '@/lib/teams';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import {
   Pin,
   Heart,
-  MessageSquare,
   Send,
-  MoreVertical,
   Pencil,
   Trash2,
   X,
+  MessageSquare,
   UserIcon,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { toast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
-type MessageWithUser = ChatMessage & {
-  messageUser: Omit<User, 'password'> | null;
+type Message = Database['public']['Tables']['messages']['Row'];
+type MessageWithUser = Message & {
+  message_user: {
+    id: string;
+    email: string;
+    created_at: string;
+    updated_at: string;
+  } | null;
 };
+
+// Type guard to check if the payload has an ID
+function hasId(obj: any): obj is { id: string } {
+  return obj && typeof obj.id === 'string';
+}
 
 export function ChatPanel() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [messages, setMessages] = useState<MessageWithUser[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [pinnedMessages, setPinnedMessages] = useState<MessageWithUser[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [teamId, setTeamId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Scroll to bottom of messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Load initial team and messages
   useEffect(() => {
-    const loadMessages = async () => {
+    const loadTeamAndMessages = async () => {
+      if (!user) return;
+
       try {
-        const rawMessages = await dbService.getMessages();
-        const messagesWithUsers = await Promise.all(
-          rawMessages.map(async message => {
-            const messageUser = message.user_id === 'system' 
-              ? {
-                  id: 'system',
-                  username: 'System',
-                  email: 'system@kanban.local',
-                  created_at: new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  ticket_id: 'USER-0000'
-                }
-              : await dbService.getUser(message.user_id);
-            return {
-              ...message,
-              messageUser
-            };
-          })
-        );
-        
-        // Sort messages by timestamp
-        const sortedMessages = messagesWithUsers.sort(
-          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-        
-        setMessages(sortedMessages);
-        setPinnedMessages(sortedMessages.filter(m => m.is_pinned));
+        // Get user's teams
+        const teams = await getUserTeams(user.id);
+        if (teams.length > 0) {
+          setTeamId(teams[0].id);
+
+          // Load messages for the team
+          const { data, error } = await supabase
+            .from('messages_with_users')
+            .select('*')
+            .eq('team_id', teams[0].id)
+            .order('created_at', { ascending: true });
+
+          if (error) throw error;
+          setMessages(data || []);
+          setPinnedMessages(data?.filter(m => m.is_pinned) || []);
+        }
       } catch (error) {
-        console.error('Failed to load messages:', error);
+        console.error('Error loading team and messages:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load messages.',
+          description: 'Failed to load messages',
           variant: 'destructive',
         });
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadMessages();
-  }, [toast]);
+    loadTeamAndMessages();
+  }, [user]);
 
+  // Set up real-time subscription
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!teamId) return;
 
+    const loadMessages = async () => {
+      const { data, error } = await supabase
+        .from('messages_with_users')
+        .select('*')
+        .eq('team_id', teamId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading messages:', error);
+        return;
+      }
+
+      setMessages(data || []);
+      setPinnedMessages(data?.filter(m => m.is_pinned) || []);
+      setTimeout(scrollToBottom, 100);
+    };
+
+    // Subscribe to messages for the team
+    const channel = supabase
+      .channel(`messages:${teamId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `team_id=eq.${teamId}`,
+        },
+        async () => {
+          // Reload messages on any change
+          await loadMessages();
+        }
+      )
+      .subscribe();
+
+    // Load initial messages
+    loadMessages();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [teamId, scrollToBottom]);
+
+  // Send a new message
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+    if (!user || !teamId || !newMessage.trim()) return;
+
+    const content = newMessage.trim();
+    // Clear input immediately for better UX
+    setNewMessage('');
 
     try {
-      const mentions = extractMentions(newMessage);
-      const message = await dbService.createMessage({
-        content: newMessage,
-        user_id: user.id,
-        likes: [],
-        is_pinned: false,
-        mentions,
-      });
+      const { error } = await supabase
+        .from('messages')
+        .insert({
+          content,
+          user_id: user.id,
+          team_id: teamId,
+          likes: [],
+          is_pinned: false,
+          mentions: [],
+        });
 
-      const messageWithUser = {
-        ...message,
-        messageUser: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          created_at: user.created_at,
-          updated_at: user.updated_at,
-          ticket_id: user.ticket_id
-        },
-      };
-
-      setMessages(prev => [...prev, messageWithUser]);
-      setNewMessage('');
-      
-      toast({
-        title: 'Message sent',
-        description: mentions.length > 0 ? `Message sent with ${mentions.length} mention(s)` : undefined,
-      });
+      if (error) throw error;
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Error sending message:', error);
       toast({
         title: 'Error',
-        description: 'Failed to send message.',
+        description: 'Failed to send message',
         variant: 'destructive',
       });
+      // Restore the message content if sending failed
+      setNewMessage(content);
     }
   };
 
-  const extractMentions = (content: string): string[] => {
-    const mentions = content.match(/@[\w-]+/g) || [];
-    return mentions.map(mention => mention.substring(1)); // Remove @ symbol
-  };
-
-  const togglePin = async (messageId: string) => {
+  // Toggle pin status
+  const handleTogglePin = async (messageId: string, currentPinned: boolean) => {
     try {
-      const message = messages.find(m => m.id === messageId);
-      if (!message) return;
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_pinned: !currentPinned })
+        .eq('id', messageId);
 
-      await dbService.updateMessage(messageId, {
-        is_pinned: !message.is_pinned,
-      });
+      if (error) throw error;
 
       // Update messages state
       const updatedMessages = messages.map(m =>
-        m.id === messageId ? { ...m, is_pinned: !m.is_pinned } : m
+        m.id === messageId ? { ...m, is_pinned: !currentPinned } : m
       );
       setMessages(updatedMessages);
 
       // Update pinned messages state
-      if (!message.is_pinned) {
-        setPinnedMessages(prev => [...prev, { ...message, is_pinned: true }]);
+      if (!currentPinned) {
+        const message = messages.find(m => m.id === messageId);
+        if (message) {
+          setPinnedMessages(prev => [...prev, { ...message, is_pinned: true }]);
+        }
       } else {
         setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
       }
 
       toast({
-        title: message.is_pinned ? 'Message unpinned' : 'Message pinned',
+        title: currentPinned ? 'Message unpinned' : 'Message pinned',
         description: 'Message has been updated',
       });
     } catch (error) {
+      console.error('Error toggling pin:', error);
       toast({
         title: 'Error',
         description: 'Failed to update message',
@@ -169,23 +209,28 @@ export function ChatPanel() {
     }
   };
 
-  const handleLike = async (messageId: string) => {
+  // Toggle like status
+  const handleToggleLike = async (messageId: string, currentLikes: string[]) => {
     if (!user) return;
 
     try {
-      const message = messages.find(m => m.id === messageId);
-      if (!message) return;
+      const newLikes = currentLikes.includes(user.id)
+        ? currentLikes.filter(id => id !== user.id)
+        : [...currentLikes, user.id];
 
-      const likes = message.likes.includes(user.id)
-        ? message.likes.filter(id => id !== user.id)
-        : [...message.likes, user.id];
+      const { error } = await supabase
+        .from('messages')
+        .update({ likes: newLikes })
+        .eq('id', messageId);
 
-      await dbService.updateMessage(messageId, { likes });
+      if (error) throw error;
 
+      // Update messages state
       setMessages(prev =>
-        prev.map(m => (m.id === messageId ? { ...m, likes } : m))
+        prev.map(m => (m.id === messageId ? { ...m, likes: newLikes } : m))
       );
     } catch (error) {
+      console.error('Error toggling like:', error);
       toast({
         title: 'Error',
         description: 'Failed to update message',
@@ -194,19 +239,26 @@ export function ChatPanel() {
     }
   };
 
-  const handleDelete = async (messageId: string) => {
+  // Delete message
+  const handleDeleteMessage = async (messageId: string) => {
     try {
-      await dbService.deleteMessage(messageId);
-      
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw error;
+
       // Update both messages and pinned messages states
       setMessages(prev => prev.filter(m => m.id !== messageId));
       setPinnedMessages(prev => prev.filter(m => m.id !== messageId));
-      
+
       toast({
         title: 'Message deleted',
         description: 'Message has been removed',
       });
     } catch (error) {
+      console.error('Error deleting message:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete message',
@@ -215,50 +267,35 @@ export function ChatPanel() {
     }
   };
 
-  const startEdit = (message: MessageWithUser) => {
+  // Start editing a message
+  const handleStartEdit = (message: MessageWithUser) => {
     setEditingMessage(message.id);
     setEditContent(message.content);
   };
 
-  const handleEdit = async (messageId: string) => {
-    if (!editContent.trim()) return;
+  // Save edited message
+  const handleSaveEdit = async () => {
+    if (!editingMessage || !editContent.trim()) return;
 
     try {
-      const mentions = extractMentions(editContent);
-      await dbService.updateMessage(messageId, {
-        content: editContent,
-        mentions,
-      });
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          content: editContent.trim(),
+          edited_at: new Date().toISOString(),
+        })
+        .eq('id', editingMessage);
 
-      const updatedMessage = {
-        content: editContent,
-        mentions,
-        edited_at: new Date().toISOString(),
-      };
+      if (error) throw error;
+      setEditingMessage(null);
+      setEditContent('');
 
-      // Update both messages and pinned messages states
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === messageId
-            ? { ...m, ...updatedMessage }
-            : m
-        )
-      );
-
-      setPinnedMessages(prev =>
-        prev.map(m =>
-          m.id === messageId
-            ? { ...m, ...updatedMessage }
-            : m
-        )
-      );
-
-      cancelEdit();
       toast({
         title: 'Message updated',
         description: 'Your changes have been saved',
       });
     } catch (error) {
+      console.error('Error updating message:', error);
       toast({
         title: 'Error',
         description: 'Failed to update message',
@@ -267,10 +304,13 @@ export function ChatPanel() {
     }
   };
 
-  const cancelEdit = () => {
-    setEditingMessage(null);
-    setEditContent('');
-  };
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col bg-card rounded-lg border shadow-sm">
@@ -300,11 +340,11 @@ export function ChatPanel() {
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <UserIcon className="h-3 w-3" />
                     <span className="font-medium">
-                      {msg.messageUser?.username || (msg.user_id === 'system' ? 'System' : 'Unknown User')}
+                      {msg.message_user?.email || 'Unknown User'}
                     </span>
                     <span>·</span>
                     <span>
-                      {format(new Date(msg.timestamp), 'MMM d, h:mm a')}
+                      {format(new Date(msg.created_at), 'MMM d, h:mm a')}
                       {msg.edited_at && (
                         <span
                           className="ml-1 inline-flex items-center text-[10px]"
@@ -316,7 +356,7 @@ export function ChatPanel() {
                     </span>
                   </div>
                   <button
-                    onClick={() => togglePin(msg.id)}
+                    onClick={() => handleTogglePin(msg.id, msg.is_pinned)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
                     title="Unpin message"
                   >
@@ -333,10 +373,13 @@ export function ChatPanel() {
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {messages.map(message => (
-            <div key={message.id} className={cn(
-              "flex gap-3 relative group",
-              message.user_id === user?.id && "flex-row-reverse"
-            )}>
+            <div
+              key={message.id}
+              className={cn(
+                "flex gap-3 relative group",
+                message.user_id === user?.id && "flex-row-reverse"
+              )}
+            >
               <div
                 className={cn(
                   "w-8 h-8 rounded-full bg-muted flex items-center justify-center",
@@ -345,18 +388,20 @@ export function ChatPanel() {
               >
                 <UserIcon className="h-4 w-4" />
               </div>
-              <div className={cn(
-                "flex flex-col gap-1 max-w-[80%]",
-                message.user_id === user?.id && "items-end"
-              )}>
+              <div
+                className={cn(
+                  "flex flex-col gap-1 max-w-[80%]",
+                  message.user_id === user?.id && "items-end"
+                )}
+              >
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium">
-                    {message.user_id === 'system' ? 'System' : message.messageUser?.username || 'Unknown User'}
+                    {message.message_user?.email || 'Unknown User'}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {format(new Date(message.timestamp), 'h:mm a')}
+                    {format(new Date(message.created_at), 'h:mm a')}
                   </span>
-                  {message.edited_at && message.user_id !== 'system' && (
+                  {message.edited_at && (
                     <span
                       className="text-xs text-muted-foreground"
                       title={`Edited ${format(new Date(message.edited_at), 'MMM d, h:mm a')}`}
@@ -365,6 +410,7 @@ export function ChatPanel() {
                     </span>
                   )}
                 </div>
+
                 {editingMessage === message.id ? (
                   <div className="flex items-center gap-2">
                     <Input
@@ -372,36 +418,38 @@ export function ChatPanel() {
                       onChange={(e) => setEditContent(e.target.value)}
                       className="min-w-[200px]"
                     />
-                    <Button
-                      size="sm"
-                      onClick={() => handleEdit(message.id)}
-                    >
+                    <Button size="sm" onClick={handleSaveEdit}>
                       Save
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={cancelEdit}
+                      onClick={() => setEditingMessage(null)}
                     >
                       Cancel
                     </Button>
                   </div>
                 ) : (
-                  <div className={cn(
-                    "rounded-lg p-3",
-                    message.user_id === user?.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  )}>
+                  <div
+                    className={cn(
+                      "rounded-lg p-3",
+                      message.user_id === user?.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted"
+                    )}
+                  >
                     {message.content}
                   </div>
                 )}
-                <div className={cn(
-                  "flex items-center gap-2 text-xs text-muted-foreground",
-                  message.user_id === user?.id && "flex-row-reverse"
-                )}>
+
+                <div
+                  className={cn(
+                    "flex items-center gap-2 text-xs text-muted-foreground",
+                    message.user_id === user?.id && "flex-row-reverse"
+                  )}
+                >
                   <button
-                    onClick={() => handleLike(message.id)}
+                    onClick={() => handleToggleLike(message.id, message.likes)}
                     className={cn(
                       "flex items-center gap-1 hover:text-foreground transition-colors",
                       message.likes.includes(user?.id || '') && "text-primary"
@@ -413,13 +461,13 @@ export function ChatPanel() {
                   {message.user_id === user?.id && !editingMessage && (
                     <>
                       <button
-                        onClick={() => startEdit(message)}
+                        onClick={() => handleStartEdit(message)}
                         className="hover:text-foreground transition-colors"
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => handleDelete(message.id)}
+                        onClick={() => handleDeleteMessage(message.id)}
                         className="hover:text-destructive transition-colors"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -427,7 +475,7 @@ export function ChatPanel() {
                     </>
                   )}
                   <button
-                    onClick={() => togglePin(message.id)}
+                    onClick={() => handleTogglePin(message.id, message.is_pinned)}
                     className={cn(
                       "hover:text-foreground transition-colors",
                       message.is_pinned && "text-primary"
@@ -439,13 +487,13 @@ export function ChatPanel() {
               </div>
             </div>
           ))}
-          <div ref={scrollRef} />
+          <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
 
       <div className="border-t p-4">
         <form
-          onSubmit={(e) => {
+          onSubmit={(e: FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             handleSendMessage();
           }}
@@ -457,7 +505,7 @@ export function ChatPanel() {
             placeholder="Type a message..."
             className="flex-1"
           />
-          <Button type="submit" size="icon">
+          <Button type="submit" size="icon" disabled={!newMessage.trim()}>
             <Send className="h-4 w-4" />
           </Button>
         </form>
