@@ -46,6 +46,7 @@ import { motion } from 'framer-motion';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import type { Database } from '@/lib/database.types';
+import { PROJECT_TEMPLATES, type BoardTemplate } from '@/lib/templates';
 
 interface Board {
   id: string;
@@ -73,6 +74,7 @@ interface CreateBoardDialogProps {
 function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<BoardTemplate | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -126,7 +128,8 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
       const description = formData.get('description') as string;
       const teamId = formData.get('team_id') as string;
 
-      const { data: board, error } = await supabase
+      // Create the board
+      const { data: board, error: boardError } = await supabase
         .from('boards')
         .insert({
           name,
@@ -137,11 +140,33 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
         .select()
         .single();
 
-      if (error) throw error;
+      if (boardError) throw boardError;
+
+      // If a template was selected, create the template tasks
+      if (selectedTemplate && board) {
+        const templateTasks = selectedTemplate.tasks.map(task => ({
+          ...task,
+          board_id: board.id,
+          team_id: teamId,
+          created_by: user.id,
+          ticket_id: `T-${Math.random().toString(36).substr(2, 8)}`,
+        }));
+
+        const { error: tasksError } = await supabase
+          .from('tasks')
+          .insert(templateTasks);
+
+        if (tasksError) throw tasksError;
+      }
 
       await onCreateSuccess();
       onOpenChange(false);
       navigate(`/board/${board.id}`);
+
+      toast({
+        title: 'Board Created',
+        description: `Successfully created ${name} ${selectedTemplate ? 'with template' : ''}`,
+      });
     } catch (error) {
       console.error('Error creating board:', error);
       toast({
@@ -156,11 +181,11 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>Create New Board</DialogTitle>
           <DialogDescription>
-            Create a new board to organize your tasks.
+            Create a new board to organize your tasks. Choose a template to get started quickly.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -172,6 +197,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                 name="name"
                 placeholder="Enter board name"
                 required
+                defaultValue={selectedTemplate?.name || ''}
               />
             </div>
             <div className="grid gap-2">
@@ -180,6 +206,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                 id="description"
                 name="description"
                 placeholder="Enter board description"
+                defaultValue={selectedTemplate?.description || ''}
               />
             </div>
             <div className="grid gap-2">
@@ -196,6 +223,37 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Template (Optional)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                {PROJECT_TEMPLATES.map((template) => (
+                  <Card
+                    key={template.id}
+                    className={cn(
+                      "cursor-pointer transition-all hover:border-primary",
+                      selectedTemplate?.id === template.id && "border-primary bg-primary/5"
+                    )}
+                    onClick={() => setSelectedTemplate(
+                      selectedTemplate?.id === template.id ? null : template
+                    )}
+                  >
+                    <CardHeader className="space-y-0 pb-2">
+                      <CardTitle className="text-base">
+                        {template.icon} {template.name}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        {template.description}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs text-muted-foreground">
+                        Includes {template.tasks.length} predefined tasks
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>
