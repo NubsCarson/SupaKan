@@ -28,7 +28,6 @@ security:
   policy: https://github.com/NubsCarson/SupaKan/security/policy
   contact: nubs@nubs.site
 funding:
-  github: NubsCarson
-  custom: https://supakan.nubs.site/sponsor
+  custom: https://ko-fi.com/nubscarson
 social:
   twitter: monerosolana
