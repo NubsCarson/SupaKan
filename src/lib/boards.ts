@@ -17,7 +17,7 @@ function transformTask(task: any): Task {
 }
 
 // Helper function to generate ticket IDs
-async function generateTicketId(teamId: string) {
+export async function generateTicketId(teamId: string) {
   const { count } = await supabase
     .from('tasks')
     .select('*', { count: 'exact', head: true })
@@ -25,7 +25,8 @@ async function generateTicketId(teamId: string) {
 
   const nextNumber = (count ?? 0) + 1;
   const timestamp = Date.now().toString(36);
-  return `${teamId.slice(0, 4)}-${timestamp}-${nextNumber.toString().padStart(4, '0')}`;
+  const random = Math.random().toString(36).substring(2, 6);
+  return `${teamId.slice(0, 4)}-${timestamp}-${random}-${nextNumber.toString().padStart(4, '0')}`;
 }
 
 // Task operations

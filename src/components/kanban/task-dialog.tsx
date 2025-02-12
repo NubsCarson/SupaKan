@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { useAuth } from '@/lib/auth-context';
 import { toast } from '@/components/ui/use-toast';
+import { generateTicketId } from '@/lib/boards';
 
 type Task = Database['public']['Tables']['tasks']['Row'];
 
@@ -87,17 +88,10 @@ export function TaskDialog({
 
         if (error) throw error;
       } else {
-        // Generate ticket ID (you might want to move this to a backend function)
-        const { count } = await supabase
-          .from('tasks')
-          .select('*', { count: 'exact', head: true });
-
-        const nextNumber = (count ?? 0) + 1;
-        const ticket_id = `TASK-${nextNumber.toString().padStart(4, '0')}`;
-
+        const ticketId = await generateTicketId(teamId);
         const { error } = await supabase
           .from('tasks')
-          .insert({ ...data, ticket_id });
+          .insert({ ...data, ticket_id: ticketId });
 
         if (error) throw error;
       }
