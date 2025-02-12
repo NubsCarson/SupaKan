@@ -328,7 +328,7 @@ export function Board() {
                       />
                     </div>
                   </div>
-                  <Droppable droppableId={id}>
+                  <Droppable droppableId={id} mode="standard" type="DEFAULT">
                     {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
@@ -365,7 +365,7 @@ export function Board() {
 
         {/* Desktop Chat Panel */}
         <div className="hidden w-[350px] xl:block">
-          <ChatPanel />
+          {board?.id && <ChatPanel boardId={board.id} />}
         </div>
 
         {/* Mobile Chat Panel */}
@@ -388,7 +388,7 @@ export function Board() {
               </Button>
             </div>
             <div className="h-[calc(70vh-3rem)]">
-              <ChatPanel />
+              {board?.id && <ChatPanel boardId={board.id} />}
             </div>
           </div>
         </div>
@@ -401,7 +401,7 @@ export function Board() {
             "fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg xl:hidden",
             isChatOpen && "translate-y-[-70vh]"
           )}
-          onClick={() => setIsChatOpen(true)}
+          onClick={() => setIsChatOpen(!isChatOpen)}
         >
           <MessageSquare className="h-6 w-6" />
         </Button>

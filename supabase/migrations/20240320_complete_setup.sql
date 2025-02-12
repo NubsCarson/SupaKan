@@ -69,6 +69,7 @@ CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     content TEXT NOT NULL,
     team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+    board_id UUID NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     is_pinned BOOLEAN NOT NULL DEFAULT false,
     likes UUID[] DEFAULT '{}',
@@ -334,11 +335,13 @@ BEGIN
         INSERT INTO messages (
             content,
             team_id,
+            board_id,
             user_id,
             is_pinned
         ) VALUES (
             '👋 Welcome to the team chat! This is where you can collaborate with your team members.',
             _team_id,
+            _board_id,
             input_user_id,
             true
         );
@@ -410,7 +413,23 @@ CREATE POLICY "Team members update" ON team_members
         EXISTS (
             SELECT 1 FROM teams t
             WHERE t.id = team_members.team_id
-            AND t.created_by = auth.uid()
+            AND (
+                -- Allow team owners to update any member
+                t.created_by = auth.uid()
+                OR
+                -- Allow admins to update non-owners
+                EXISTS (
+                    SELECT 1 FROM team_members tm
+                    WHERE tm.team_id = team_members.team_id
+                    AND tm.user_id = auth.uid()
+                    AND tm.role = 'admin'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM team_members tm2
+                        WHERE tm2.id = team_members.id
+                        AND tm2.role = 'owner'
+                    )
+                )
+            )
         )
     );
 
@@ -418,8 +437,17 @@ CREATE POLICY "Team members delete" ON team_members
     FOR DELETE USING (
         EXISTS (
             SELECT 1 FROM teams t
+            LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = auth.uid()
             WHERE t.id = team_members.team_id
-            AND t.created_by = auth.uid()
+            AND (
+                t.created_by = auth.uid()  -- Team owner can remove anyone
+                OR (tm.role = 'admin' AND NOT EXISTS (  -- Admin can remove non-owners
+                    SELECT 1 FROM team_members tm2
+                    WHERE tm2.id = team_members.id
+                    AND tm2.role = 'owner'
+                ))
+                OR team_members.user_id = auth.uid()  -- Members can remove themselves
+            )
         )
     );
 
@@ -527,7 +555,9 @@ CREATE POLICY "Message select" ON messages
         user_id = auth.uid() OR
         EXISTS (
             SELECT 1 FROM team_members tm
+            JOIN boards b ON b.team_id = tm.team_id
             WHERE tm.team_id = messages.team_id
+            AND b.id = messages.board_id
             AND tm.user_id = auth.uid()
         )
     );
@@ -536,7 +566,9 @@ CREATE POLICY "Message insert" ON messages
     FOR INSERT WITH CHECK (
         EXISTS (
             SELECT 1 FROM team_members tm
+            JOIN boards b ON b.team_id = tm.team_id
             WHERE tm.team_id = messages.team_id
+            AND b.id = messages.board_id
             AND tm.user_id = auth.uid()
         )
     );
@@ -545,7 +577,9 @@ CREATE POLICY "Message update" ON messages
     FOR UPDATE USING (
         EXISTS (
             SELECT 1 FROM team_members tm
+            JOIN boards b ON b.team_id = tm.team_id
             WHERE tm.team_id = messages.team_id
+            AND b.id = messages.board_id
             AND tm.user_id = auth.uid()
         )
     );
@@ -554,7 +588,9 @@ CREATE POLICY "Message delete" ON messages
     FOR DELETE USING (
         EXISTS (
             SELECT 1 FROM team_members tm
+            JOIN boards b ON b.team_id = tm.team_id
             WHERE tm.team_id = messages.team_id
+            AND b.id = messages.board_id
             AND tm.user_id = auth.uid()
         )
     );
@@ -580,4 +616,41 @@ GRANT EXECUTE ON FUNCTION update_task_positions(task_position_update[]) TO authe
 ALTER FUNCTION ensure_user_has_team(UUID) OWNER TO postgres;
 ALTER FUNCTION trigger_ensure_user_has_team() OWNER TO postgres;
 ALTER FUNCTION update_updated_at_column() OWNER TO postgres;
-ALTER FUNCTION update_task_positions(task_position_update[]) OWNER TO postgres; 
+ALTER FUNCTION update_task_positions(task_position_update[]) OWNER TO postgres;
+
+-- Function to remove team member with proper policy checks
+CREATE OR REPLACE FUNCTION remove_team_member(p_member_id UUID, p_team_id UUID)
+RETURNS void
+SECURITY DEFINER
+SET search_path = public, auth
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Delete the member if policy conditions are met
+    DELETE FROM team_members
+    WHERE id = p_member_id
+    AND team_id = p_team_id
+    AND EXISTS (
+        SELECT 1 FROM teams t
+        LEFT JOIN team_members tm ON tm.team_id = t.id AND tm.user_id = auth.uid()
+        WHERE t.id = p_team_id
+        AND (
+            t.created_by = auth.uid()  -- Team owner can remove anyone
+            OR (tm.role = 'admin' AND NOT EXISTS (  -- Admin can remove non-owners
+                SELECT 1 FROM team_members tm2
+                WHERE tm2.id = p_member_id
+                AND tm2.role = 'owner'
+            ))
+            OR team_members.user_id = auth.uid()  -- Members can remove themselves
+        )
+    );
+
+    -- Verify the deletion happened
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Failed to remove member - insufficient permissions or member not found';
+    END IF;
+END;
+$$;
+
+-- Grant execute permission on the function
+GRANT EXECUTE ON FUNCTION remove_team_member(UUID, UUID) TO authenticated; 

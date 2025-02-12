@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, RouterProvider, type RouterOptions } from 'react-router-dom';
 import { SystemDashboard } from '@/components/system-dashboard';
 import AuthCallback from '@/routes/auth/callback';
 import { Logo } from '@/components/logo';
@@ -247,7 +247,7 @@ const router = createBrowserRouter(
     future: {
       v7_startTransition: true,
       v7_relativeSplatPath: true
-    }
+    } satisfies RouterOptions['future']
   }
 );
 

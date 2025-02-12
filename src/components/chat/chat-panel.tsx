@@ -36,13 +36,17 @@ function hasId(obj: any): obj is { id: string } {
   return obj && typeof obj.id === 'string';
 }
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  boardId: string;
+}
+
+export function ChatPanel({ boardId }: ChatPanelProps) {
   const { user } = useAuth();
   const [messages, setMessages] = useState<MessageWithUser[]>([]);
   const [pinnedMessages, setPinnedMessages] = useState<MessageWithUser[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [teamId, setTeamId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -82,54 +86,48 @@ export function ChatPanel() {
     return () => scrollArea.removeEventListener('scroll', handleScroll);
   }, [checkIfNearBottom]);
 
-  // Load initial team and messages
+  // Load initial messages
   useEffect(() => {
-    const loadTeamAndMessages = async () => {
-      if (!user) return;
+    const loadMessages = async () => {
+      if (!user || !boardId) {
+        setError('Unable to load messages');
+        setIsLoading(false);
+        return;
+      }
 
       try {
-        // Get user's teams
-        const teams = await getUserTeams(user.id);
-        if (teams.length > 0) {
-          setTeamId(teams[0].id);
+        setError(null);
+        const { data, error } = await supabase
+          .from('messages_with_users')
+          .select('*')
+          .eq('board_id', boardId)
+          .order('created_at', { ascending: true });
 
-          // Load messages for the team
-          const { data, error } = await supabase
-            .from('messages_with_users')
-            .select('*')
-            .eq('team_id', teams[0].id)
-            .order('created_at', { ascending: true });
-
-          if (error) throw error;
-          setMessages(data || []);
-          setPinnedMessages(data?.filter(m => m.is_pinned) || []);
-          // Force scroll to bottom on initial load
-          setTimeout(() => scrollToBottom(true), 100);
-        }
+        if (error) throw error;
+        setMessages(data || []);
+        setPinnedMessages(data?.filter(m => m.is_pinned) || []);
+        // Force scroll to bottom on initial load
+        setTimeout(() => scrollToBottom(true), 100);
       } catch (error) {
-        console.error('Error loading team and messages:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load messages',
-          variant: 'destructive',
-        });
+        console.error('Error loading messages:', error);
+        setError('Failed to load messages');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadTeamAndMessages();
-  }, [user, scrollToBottom]);
+    loadMessages();
+  }, [user?.id, boardId, scrollToBottom]);
 
   // Set up real-time subscription
   useEffect(() => {
-    if (!teamId) return;
+    if (!boardId) return;
 
     const loadMessages = async () => {
       const { data, error } = await supabase
         .from('messages_with_users')
         .select('*')
-        .eq('team_id', teamId)
+        .eq('board_id', boardId)
         .order('created_at', { ascending: true });
 
       if (error) {
@@ -144,14 +142,14 @@ export function ChatPanel() {
 
     // Subscribe to both messages table and messages_with_users view
     const channel = supabase
-      .channel(`messages:${teamId}`)
+      .channel(`messages:${boardId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'messages',
-          filter: `team_id=eq.${teamId}`,
+          filter: `board_id=eq.${boardId}`,
         },
         async (payload) => {
           console.log('Message change:', payload);
@@ -164,7 +162,7 @@ export function ChatPanel() {
           event: '*',
           schema: 'public',
           table: 'messages_with_users',
-          filter: `team_id=eq.${teamId}`,
+          filter: `board_id=eq.${boardId}`,
         },
         async (payload) => {
           console.log('Messages with users change:', payload);
@@ -185,24 +183,34 @@ export function ChatPanel() {
       console.log('Cleaning up subscription');
       supabase.removeChannel(channel);
     };
-  }, [teamId, scrollToBottom]);
+  }, [boardId, scrollToBottom]);
 
   // Send a new message
   const handleSendMessage = async () => {
-    if (!user || !teamId || !newMessage.trim()) return;
+    if (!user || !boardId || !newMessage.trim()) return;
 
     const content = newMessage.trim();
     // Clear input immediately for better UX
     setNewMessage('');
 
     try {
+      // Get the team_id for this board
+      const { data: board, error: boardError } = await supabase
+        .from('boards')
+        .select('team_id')
+        .eq('id', boardId)
+        .single();
+
+      if (boardError) throw boardError;
+
       // First, insert the message
       const { data: newMessage, error: insertError } = await supabase
         .from('messages')
         .insert({
           content,
           user_id: user.id,
-          team_id: teamId,
+          team_id: board.team_id,
+          board_id: boardId,
           likes: [],
           is_pinned: false,
           mentions: [],
@@ -374,7 +382,23 @@ export function ChatPanel() {
   if (isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+          <div className="text-sm text-muted-foreground">Loading messages...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <div className="text-sm text-destructive">{error}</div>
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }

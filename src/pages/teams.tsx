@@ -450,6 +450,8 @@ export default function TeamsPage() {
     try {
       if (!user?.id) return;
 
+      console.log('Loading teams for user:', user.id);
+
       // First get the teams the user is a member of
       const { data: memberTeams, error: memberError } = await supabase
         .from('team_members')
@@ -465,7 +467,13 @@ export default function TeamsPage() {
         `)
         .eq('user_id', user.id);
 
-      if (memberError) throw memberError;
+      if (memberError) {
+        console.error('Error loading member teams:', memberError);
+        throw memberError;
+      }
+
+      console.log('Member teams:', memberTeams);
+
       if (!memberTeams) return;
 
       // For each team, get its members using the view
@@ -474,9 +482,15 @@ export default function TeamsPage() {
           const { data: members, error: membersError } = await supabase
             .from('team_members_with_users')
             .select('*')
-            .eq('team_id', teamData.team_id);
+            .eq('team_id', teamData.team_id)
+            .order('role', { ascending: false }); // Order by role to put owners first
 
-          if (membersError) throw membersError;
+          if (membersError) {
+            console.error('Error loading team members:', membersError);
+            throw membersError;
+          }
+
+          console.log('Team members for team', teamData.team_id, ':', members);
 
           const team: Team = {
             id: teamData.teams.id,
@@ -491,6 +505,7 @@ export default function TeamsPage() {
         })
       );
 
+      console.log('Teams with members:', teamsWithMembers);
       setTeams(teamsWithMembers);
     } catch (error) {
       console.error('Error loading teams:', error);
@@ -595,26 +610,89 @@ export default function TeamsPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = async (memberId: string, teamId: string) => {
     try {
-      const { error } = await supabase
+      console.log('Attempting to remove member:', memberId, 'from team:', teamId);
+      
+      // Get the current user's role in the team
+      const { data: userRole, error: roleError } = await supabase
         .from('team_members')
-        .delete()
-        .eq('id', memberId);
+        .select('role')
+        .eq('team_id', teamId)
+        .eq('user_id', user?.id)
+        .single();
 
-      if (error) throw error;
+      if (roleError) {
+        console.error('Error checking user role:', roleError);
+        throw roleError;
+      }
+
+      console.log('Current user role:', userRole);
+
+      // Get the member being removed
+      const { data: memberToRemove, error: memberError } = await supabase
+        .from('team_members_with_users')
+        .select('role, user_id, id')
+        .eq('id', memberId)
+        .eq('team_id', teamId)
+        .single();
+
+      if (memberError) {
+        console.error('Error getting member details:', memberError);
+        throw memberError;
+      }
+
+      if (!memberToRemove) {
+        throw new Error('Member not found');
+      }
+
+      console.log('Member to remove:', memberToRemove);
+
+      // Verify permissions
+      if (userRole.role !== 'owner' && memberToRemove.role === 'owner') {
+        throw new Error('Only team owners can remove other owners');
+      }
+
+      // Get team details to verify ownership
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .select('created_by')
+        .eq('id', teamId)
+        .single();
+
+      if (teamError) {
+        console.error('Error checking team:', teamError);
+        throw teamError;
+      }
+
+      console.log('Team details:', team);
+
+      // Delete the member - simplified to match policy exactly
+      const { error: deleteError } = await supabase
+        .rpc('remove_team_member', {
+          p_member_id: memberId,
+          p_team_id: teamId
+        });
+
+      if (deleteError) {
+        console.error('Delete error:', deleteError);
+        throw deleteError;
+      }
+
+      // Force a refresh of the teams data
+      console.log('Reloading teams data...');
+      await loadTeams();
+      console.log('Teams data reloaded');
 
       toast({
         title: 'Success',
         description: 'Member removed successfully',
       });
-
-      await loadTeams();
     } catch (error) {
       console.error('Error removing member:', error);
       toast({
         title: 'Error',
-        description: 'Failed to remove member',
+        description: error instanceof Error ? error.message : 'Failed to remove member',
         variant: 'destructive',
       });
     }
@@ -753,7 +831,7 @@ export default function TeamsPage() {
                             </DropdownMenuSub>
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
-                              onClick={() => handleRemoveMember(member.id)}
+                              onClick={() => handleRemoveMember(member.id, team.id)}
                             >
                               Remove Member
                             </DropdownMenuItem>
