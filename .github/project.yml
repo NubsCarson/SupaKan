@@ -1,0 +1,31 @@
+name: SupaKan
+description: Instant task management platform built on Supabase with real-time collaboration
+repository: NubsCarson/SupaKan
+website: https://supakan.nubs.site
+category: Task Management
+keywords:
+  - task-management
+  - kanban
+  - real-time
+  - supabase
+  - react
+  - typescript
+  - team-collaboration
+  - productivity
+maintainers:
+  - name: Nubs Carson
+    email: nubs@nubs.site
+    url: https://github.com/NubsCarson
+support:
+  email: support@nubs.site
+  docs: https://supakan.nubs.site/docs
+  community: https://github.com/NubsCarson/SupaKan/discussions
+security:
+  policy: https://github.com/NubsCarson/SupaKan/security/policy
+  contact: security@nubs.site
+funding:
+  github: NubsCarson
+  custom: https://supakan.nubs.site/sponsor
+social:
+  twitter: monerosolana
+  discord: https://discord.gg/your-invite-link 

@@ -2,6 +2,23 @@
 
 ![SupaKan Preview](public/og-preview.png)
 
+<div align="center">
+
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/NubsCarson/SupaKan)](https://github.com/NubsCarson/SupaKan/releases)
+[![GitHub license](https://img.shields.io/github/license/NubsCarson/SupaKan)](https://github.com/NubsCarson/SupaKan/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/NubsCarson/SupaKan)](https://github.com/NubsCarson/SupaKan/stargazers)
+[![CI Status](https://github.com/NubsCarson/SupaKan/workflows/CI/badge.svg)](https://github.com/NubsCarson/SupaKan/actions)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.2-blue.svg)](https://reactjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-2.39-green.svg)](https://supabase.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-blue.svg)](https://tailwindcss.com/)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20Development-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/nubscarson)
+[![Twitter Follow](https://img.shields.io/twitter/follow/monerosolana?style=social)](https://twitter.com/monerosolana)
+
+[View Demo](https://supakan.nubs.site) • [Report Bug](https://github.com/NubsCarson/SupaKan/issues) • [Request Feature](https://github.com/NubsCarson/SupaKan/issues)
+
+</div>
+
 A modern task management platform built **100% on Supabase** - no additional backend required! Experience true real-time collaboration with instant updates for both solo work and team projects. Every feature, from task movements to team chat, updates instantly across all connected users.
 
 ## 🌟 Why SupaKan?
