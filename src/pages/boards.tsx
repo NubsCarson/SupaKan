@@ -433,8 +433,8 @@ export default function BoardsPage() {
               {tasks.filter(t => t.status === 'done').length} tasks completed
             </div>
             <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-              <Users className="mr-1 h-3.5 w-3.5 text-blue-500" />
-              {tasks.filter(t => t.assigned_to).length} assigned tasks
+              <Clock className="mr-1 h-3.5 w-3.5 text-blue-500" />
+              {tasks.filter(t => t.status !== 'done').length} unfinished tasks
             </div>
             {tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length > 0 && (
               <div className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2.5 py-0.5 text-sm font-semibold text-red-500 dark:border-red-900/30 dark:bg-red-900/20">
