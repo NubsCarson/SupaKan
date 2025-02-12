@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: read
+
 jobs:
   validate:
     name: 🔍 Validate
@@ -72,6 +78,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
