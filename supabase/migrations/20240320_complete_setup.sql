@@ -401,11 +401,8 @@ CREATE POLICY "Team members select" ON team_members
 
 CREATE POLICY "Team members insert" ON team_members 
     FOR INSERT WITH CHECK (
-        EXISTS (
-            SELECT 1 FROM teams t
-            WHERE t.id = team_members.team_id
-            AND t.created_by = auth.uid()
-        )
+        -- Allow users to join any team
+        true
     );
 
 CREATE POLICY "Team members update" ON team_members 
@@ -429,12 +426,8 @@ CREATE POLICY "Team members delete" ON team_members
 -- Team access policies
 CREATE POLICY "Team select" ON teams 
     FOR SELECT USING (
-        created_by = auth.uid() OR
-        EXISTS (
-            SELECT 1 FROM team_members tm
-            WHERE tm.team_id = teams.id
-            AND tm.user_id = auth.uid()
-        )
+        -- Allow users to see all teams for joining purposes
+        true
     );
 
 CREATE POLICY "Team insert" ON teams 

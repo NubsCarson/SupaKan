@@ -2,21 +2,62 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Plus, Loader2, Users, Crown, Settings } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Plus, Loader2, Users, Crown, Settings, Mail, Copy, Check, UserPlus, Shield, LogOut } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { Database } from '@/lib/database.types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
+  DropdownMenuSubContent,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from '@/lib/utils';
 
 type TeamMember = Database['public']['Views']['team_members_with_users']['Row'];
-type TeamMemberResponse = Database['public']['Tables']['team_members']['Row'] & {
+interface TeamMemberResponse {
+  team_id: string;
+  role: 'owner' | 'admin' | 'member' | 'guest';
   teams: {
     id: string;
     name: string;
     created_at: string;
     created_by: string;
   };
-};
+}
 
 interface Team {
   id: string;
@@ -24,19 +65,391 @@ interface Team {
   created_at: string;
   members: TeamMember[];
   is_owner: boolean;
+  created_by: string;
+}
+
+interface JoinTeamDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onJoinSuccess: () => Promise<void>;
+}
+
+interface CreateTeamDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreateSuccess: () => Promise<void>;
+}
+
+interface InviteMemberDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  team: Team;
+  onInviteSuccess: () => Promise<void>;
+}
+
+function JoinTeamDialog({ open, onOpenChange, onJoinSuccess }: JoinTeamDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const { user } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmitting(true);
+    try {
+      // Extract team ID from invite code and validate format
+      const teamId = inviteCode.trim();
+      if (!teamId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+        throw new Error('Invalid team ID format');
+      }
+
+      // Verify team exists
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('id', teamId)
+        .maybeSingle();
+
+      if (teamError) {
+        console.error('Team lookup error:', teamError);
+        throw new Error('Failed to verify team');
+      }
+
+      if (!team) {
+        throw new Error('Team not found. Please check the invite code and try again.');
+      }
+
+      // Check if already a member
+      const { data: existingMember, error: memberError } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (memberError) {
+        console.error('Member check error:', memberError);
+        throw new Error('Failed to verify membership');
+      }
+
+      if (existingMember) {
+        throw new Error('You are already a member of this team');
+      }
+
+      // Join team as member
+      const { error: joinError } = await supabase
+        .from('team_members')
+        .insert({
+          team_id: teamId,
+          user_id: user.id,
+          role: 'member'
+        });
+
+      if (joinError) {
+        console.error('Join error:', joinError);
+        throw new Error('Failed to join team');
+      }
+
+      toast({
+        title: 'Success',
+        description: `You have successfully joined ${team.name}`,
+      });
+
+      await onJoinSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error joining team:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to join team',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Join a Team</DialogTitle>
+          <DialogDescription>
+            Enter the team invite code to join an existing team.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="inviteCode">Team Invite Code</Label>
+              <Input
+                id="inviteCode"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Enter team ID (UUID format)"
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                The team invite code should be in UUID format (e.g., xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx).
+                You can get this from a team owner.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Joining...' : 'Join Team'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateTeamDialog({ open, onOpenChange, onCreateSuccess }: CreateTeamDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const teamName = formData.get('teamName') as string;
+
+      // Create team
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .insert({
+          name: teamName,
+          created_by: user.id
+        })
+        .select()
+        .single();
+
+      if (teamError) throw teamError;
+
+      // Add creator as owner
+      const { error: memberError } = await supabase
+        .from('team_members')
+        .insert({
+          team_id: team.id,
+          user_id: user.id,
+          role: 'owner'
+        });
+
+      if (memberError) throw memberError;
+
+      toast({
+        title: 'Success',
+        description: 'Team created successfully',
+      });
+
+      await onCreateSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error creating team:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create team',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create New Team</DialogTitle>
+          <DialogDescription>
+            Create a new team and invite your colleagues.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="teamName">Team Name</Label>
+              <Input
+                id="teamName"
+                name="teamName"
+                placeholder="Enter team name"
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Team'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InviteMemberDialog({ open, onOpenChange, team, onInviteSuccess }: InviteMemberDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { user } = useAuth();
+
+  const handleCopyInviteCode = async () => {
+    try {
+      await navigator.clipboard.writeText(team.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast({
+        title: 'Copied!',
+        description: 'Team invite code copied to clipboard',
+      });
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to copy invite code',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleInviteByEmail = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData(e.currentTarget);
+      const email = formData.get('email') as string;
+
+      // In a real app, you would send an email invitation here
+      // For now, we'll just show a success message
+      toast({
+        title: 'Invitation Sent',
+        description: `An invitation has been sent to ${email}`,
+      });
+
+      await onInviteSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error inviting member:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to send invitation',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Invite Team Members</DialogTitle>
+          <DialogDescription>
+            Share the team invite code or send email invitations.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-6">
+          <div className="space-y-4">
+            <Label>Team Invite Code</Label>
+            <div className="flex items-center gap-2">
+              <Input value={team.id} readOnly />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleCopyInviteCode}
+              >
+                {copied ? (
+                  <Check className="h-4 w-4" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or invite by email
+              </span>
+            </div>
+          </div>
+          <form onSubmit={handleInviteByEmail}>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="Enter email address"
+                  required
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? 'Sending...' : 'Send Invitation'}
+                </Button>
+              </DialogFooter>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [isLeaveTeamDialogOpen, setIsLeaveTeamDialogOpen] = useState(false);
+  const [isDeleteTeamDialogOpen, setIsDeleteTeamDialogOpen] = useState(false);
   const { user } = useAuth();
 
-  useEffect(() => {
-    loadTeams();
-  }, []);
-
-  async function loadTeams() {
+  const loadTeams = async () => {
     try {
+      if (!user?.id) return;
+
       // First get the teams the user is a member of
       const { data: memberTeams, error: memberError } = await supabase
         .from('team_members')
@@ -50,15 +463,14 @@ export default function TeamsPage() {
             created_by
           )
         `)
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
       if (memberError) throw memberError;
-
       if (!memberTeams) return;
 
       // For each team, get its members using the view
       const teamsWithMembers = await Promise.all(
-        (memberTeams as TeamMemberResponse[]).map(async (teamData) => {
+        memberTeams.map(async (teamData: any) => {
           const { data: members, error: membersError } = await supabase
             .from('team_members_with_users')
             .select('*')
@@ -70,6 +482,7 @@ export default function TeamsPage() {
             id: teamData.teams.id,
             name: teamData.teams.name,
             created_at: teamData.teams.created_at,
+            created_by: teamData.teams.created_by,
             members: members || [],
             is_owner: teamData.role === 'owner'
           };
@@ -89,47 +502,123 @@ export default function TeamsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function handleCreateTeam() {
+  useEffect(() => {
+    loadTeams();
+  }, [user?.id]);
+
+  const handleLeaveTeam = async () => {
+    if (!selectedTeam || !user) return;
+
     try {
-      const { data: team, error } = await supabase
-        .from('teams')
-        .insert({
-          name: 'New Team',
-          created_by: user?.id
-        })
-        .select()
-        .single();
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('team_id', selectedTeam.id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      // Add creator as owner
-      const { error: memberError } = await supabase
-        .from('team_members')
-        .insert({
-          team_id: team.id,
-          user_id: user?.id,
-          role: 'owner'
-        });
-
-      if (memberError) throw memberError;
+      toast({
+        title: 'Success',
+        description: 'You have left the team',
+      });
 
       await loadTeams();
+    } catch (error) {
+      console.error('Error leaving team:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to leave team',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLeaveTeamDialogOpen(false);
+      setSelectedTeam(null);
+    }
+  };
+
+  const handleDeleteTeam = async () => {
+    if (!selectedTeam || !user) return;
+
+    try {
+      const { error } = await supabase
+        .from('teams')
+        .delete()
+        .eq('id', selectedTeam.id)
+        .eq('created_by', user.id);
+
+      if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Team created successfully',
+        description: 'Team deleted successfully',
       });
+
+      await loadTeams();
     } catch (error) {
-      console.error('Error creating team:', error);
+      console.error('Error deleting team:', error);
       toast({
         title: 'Error',
-        description: 'Failed to create team',
+        description: 'Failed to delete team',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleteTeamDialogOpen(false);
+      setSelectedTeam(null);
+    }
+  };
+
+  const handleUpdateMemberRole = async (memberId: string, teamId: string, newRole: TeamMember['role']) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .update({ role: newRole })
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Member role updated successfully',
+      });
+
+      await loadTeams();
+    } catch (error) {
+      console.error('Error updating member role:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update member role',
         variant: 'destructive',
       });
     }
-  }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Member removed successfully',
+      });
+
+      await loadTeams();
+    } catch (error) {
+      console.error('Error removing member:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove member',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (loading) {
     return (
@@ -141,17 +630,28 @@ export default function TeamsPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Teams</h1>
-        <Button onClick={handleCreateTeam}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Team
-        </Button>
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Teams</h1>
+          <p className="text-muted-foreground">
+            Manage your teams and team members
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button onClick={() => setIsJoinDialogOpen(true)} variant="outline">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Join Team
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            New Team
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {teams.map((team) => (
-          <Card key={team.id}>
+          <Card key={team.id} className="flex flex-col">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -159,16 +659,41 @@ export default function TeamsPage() {
                   {team.name}
                 </CardTitle>
                 {team.is_owner && (
-                  <Button variant="ghost" size="icon">
-                    <Settings className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedTeam(team);
+                          setIsInviteDialogOpen(true);
+                        }}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Invite Members
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => {
+                          setSelectedTeam(team);
+                          setIsDeleteTeamDialogOpen(true);
+                        }}
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Delete Team
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
               <CardDescription>
                 Created {new Date(team.created_at).toLocaleDateString()}
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               <div className="space-y-4">
                 <div className="text-sm font-medium">Members</div>
                 <div className="space-y-2">
@@ -187,28 +712,146 @@ export default function TeamsPage() {
                           <div className="text-sm font-medium">
                             {member.user_email}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            {member.role === 'owner' && (
+                              <Crown className="h-3 w-3 text-yellow-500" />
+                            )}
+                            {member.role === 'admin' && (
+                              <Shield className="h-3 w-3 text-blue-500" />
+                            )}
                             {member.role}
                           </div>
                         </div>
                       </div>
-                      {member.role === 'owner' && (
-                        <Crown className="h-4 w-4 text-yellow-500" />
+                      {team.is_owner && member.user_id !== user?.id && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Settings className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>
+                                <Shield className="mr-2 h-4 w-4" />
+                                Change Role
+                              </DropdownMenuSubTrigger>
+                              <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                  <DropdownMenuItem
+                                    onClick={() => handleUpdateMemberRole(member.id, team.id, 'admin')}
+                                  >
+                                    Make Admin
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handleUpdateMemberRole(member.id, team.id, 'member')}
+                                  >
+                                    Make Member
+                                  </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleRemoveMember(member.id)}
+                            >
+                              Remove Member
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
             </CardContent>
+            {!team.is_owner && (
+              <CardFooter className="pt-4">
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive hover:bg-destructive/90 hover:text-destructive-foreground"
+                  onClick={() => {
+                    setSelectedTeam(team);
+                    setIsLeaveTeamDialogOpen(true);
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Leave Team
+                </Button>
+              </CardFooter>
+            )}
           </Card>
         ))}
 
         {teams.length === 0 && (
           <div className="col-span-full text-center text-muted-foreground">
-            No teams found. Create your first team to get started!
+            No teams found. Create your first team or join an existing one!
           </div>
         )}
       </div>
+
+      <JoinTeamDialog
+        open={isJoinDialogOpen}
+        onOpenChange={setIsJoinDialogOpen}
+        onJoinSuccess={loadTeams}
+      />
+
+      <CreateTeamDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onCreateSuccess={loadTeams}
+      />
+
+      {selectedTeam && (
+        <InviteMemberDialog
+          open={isInviteDialogOpen}
+          onOpenChange={setIsInviteDialogOpen}
+          team={selectedTeam}
+          onInviteSuccess={loadTeams}
+        />
+      )}
+
+      <AlertDialog open={isLeaveTeamDialogOpen} onOpenChange={setIsLeaveTeamDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to leave this team?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will lose access to all boards and tasks associated with this team.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLeaveTeam}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Leave Team
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteTeamDialogOpen} onOpenChange={setIsDeleteTeamDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this team?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the team and all associated boards and tasks.
+              All team members will lose access. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTeam}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete Team
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

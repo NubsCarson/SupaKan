@@ -242,7 +242,13 @@ const router = createBrowserRouter(
       <Route path="auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/boards" replace />} />
     </Route>
-  )
+  ),
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true
+    }
+  }
 );
 
 export default function App() {
