@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Footer } from '@/components/footer';
-import { Github, Gauge, LogOut, Settings, User, ChevronDown } from 'lucide-react';
+import { Github, Gauge, LogOut, Settings, User, ChevronDown, LayoutGrid, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,6 +36,8 @@ import { Logo } from '@/components/logo';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import BoardsPage from '@/pages/boards';
+import TeamsPage from '@/pages/teams';
 
 function LoadingSpinner() {
   return (
@@ -109,11 +111,28 @@ function Layout() {
             {isAuthenticated && (
               <nav className="flex items-center space-x-6 text-sm font-medium">
                 <Link 
+                  to="/boards" 
+                  className="transition-colors hover:text-foreground/80 flex items-center gap-2"
+                  title="My Boards"
+                >
+                  <LayoutGrid className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">Boards</span>
+                </Link>
+                <Link 
+                  to="/teams" 
+                  className="transition-colors hover:text-foreground/80 flex items-center gap-2"
+                  title="Teams"
+                >
+                  <Users className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">Teams</span>
+                </Link>
+                <Link 
                   to="/dashboard" 
-                  className="transition-colors hover:text-foreground/80"
+                  className="transition-colors hover:text-foreground/80 flex items-center gap-2"
                   title="System Dashboard"
                 >
                   <Gauge className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">Dashboard</span>
                 </Link>
               </nav>
             )}
@@ -215,10 +234,13 @@ function Layout() {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path="/*" element={<Layout />}>
-      <Route index element={<ProtectedRoute><Board /></ProtectedRoute>} />
+      <Route index element={<Navigate to="/boards" replace />} />
+      <Route path="boards" element={<ProtectedRoute><BoardsPage /></ProtectedRoute>} />
+      <Route path="board/:id" element={<ProtectedRoute><Board /></ProtectedRoute>} />
+      <Route path="teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
       <Route path="dashboard" element={<ProtectedRoute><SystemDashboard /></ProtectedRoute>} />
       <Route path="auth/callback" element={<AuthCallback />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/boards" replace />} />
     </Route>
   )
 );

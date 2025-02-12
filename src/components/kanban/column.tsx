@@ -1,6 +1,8 @@
 import { TaskCard } from './task-card';
-import type { Task } from '@/lib/types';
+import type { Database } from '@/lib/database.types';
 import { PlusCircle } from 'lucide-react';
+
+type Task = Database['public']['Tables']['tasks']['Row'];
 
 interface ColumnProps {
   tasks: Task[];

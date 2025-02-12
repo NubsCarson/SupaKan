@@ -37,7 +37,7 @@ export interface Database {
           id: string
           team_id: string
           user_id: string
-          role: 'owner' | 'admin' | 'member'
+          role: 'owner' | 'admin' | 'member' | 'guest'
           created_at: string
           updated_at: string
         }
@@ -45,7 +45,7 @@ export interface Database {
           id?: string
           team_id: string
           user_id: string
-          role: 'owner' | 'admin' | 'member'
+          role: 'owner' | 'admin' | 'member' | 'guest'
           created_at?: string
           updated_at?: string
         }
@@ -53,7 +53,7 @@ export interface Database {
           id?: string
           team_id?: string
           user_id?: string
-          role?: 'owner' | 'admin' | 'member'
+          role?: 'owner' | 'admin' | 'member' | 'guest'
           created_at?: string
           updated_at?: string
         }
@@ -61,7 +61,8 @@ export interface Database {
       boards: {
         Row: {
           id: string
-          title: string
+          name: string
+          description: string | null
           team_id: string
           created_by: string
           created_at: string
@@ -69,7 +70,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          title: string
+          name: string
+          description?: string | null
           team_id: string
           created_by: string
           created_at?: string
@@ -77,7 +79,8 @@ export interface Database {
         }
         Update: {
           id?: string
-          title?: string
+          name?: string
+          description?: string | null
           team_id?: string
           created_by?: string
           created_at?: string
@@ -91,15 +94,15 @@ export interface Database {
           description: string | null
           status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done'
           priority: 'low' | 'medium' | 'high'
+          position: number
           ticket_id: string
-          created_by: string
-          assigned_to: string | null
           board_id: string
           team_id: string
-          position: number
-          labels: string[]
-          estimated_hours: number | null
+          created_by: string
+          assigned_to: string | null
           due_date: string | null
+          estimated_hours: number | null
+          labels: string[]
           created_at: string
           updated_at: string
         }
@@ -109,15 +112,15 @@ export interface Database {
           description?: string | null
           status: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done'
           priority: 'low' | 'medium' | 'high'
+          position?: number
           ticket_id: string
-          created_by: string
-          assigned_to?: string | null
           board_id: string
           team_id: string
-          position: number
-          labels?: string[]
-          estimated_hours?: number | null
+          created_by: string
+          assigned_to?: string | null
           due_date?: string | null
+          estimated_hours?: number | null
+          labels?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -127,15 +130,15 @@ export interface Database {
           description?: string | null
           status?: 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done'
           priority?: 'low' | 'medium' | 'high'
+          position?: number
           ticket_id?: string
-          created_by?: string
-          assigned_to?: string | null
           board_id?: string
           team_id?: string
-          position?: number
-          labels?: string[]
-          estimated_hours?: number | null
+          created_by?: string
+          assigned_to?: string | null
           due_date?: string | null
+          estimated_hours?: number | null
+          labels?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -144,9 +147,10 @@ export interface Database {
         Row: {
           id: string
           content: string
+          team_id: string
           user_id: string
-          likes: string[]
           is_pinned: boolean
+          likes: string[]
           mentions: string[]
           created_at: string
           updated_at: string
@@ -155,9 +159,10 @@ export interface Database {
         Insert: {
           id?: string
           content: string
+          team_id: string
           user_id: string
-          likes?: string[]
           is_pinned?: boolean
+          likes?: string[]
           mentions?: string[]
           created_at?: string
           updated_at?: string
@@ -166,9 +171,10 @@ export interface Database {
         Update: {
           id?: string
           content?: string
+          team_id?: string
           user_id?: string
-          likes?: string[]
           is_pinned?: boolean
+          likes?: string[]
           mentions?: string[]
           created_at?: string
           updated_at?: string
@@ -177,10 +183,38 @@ export interface Database {
       }
     }
     Views: {
-      [_ in never]: never
+      messages_with_users: {
+        Row: {
+          id: string
+          content: string
+          team_id: string
+          user_id: string
+          is_pinned: boolean
+          likes: string[]
+          mentions: string[]
+          created_at: string
+          updated_at: string
+          edited_at: string | null
+          message_user: Json
+        }
+      }
     }
     Functions: {
-      [_ in never]: never
+      ensure_user_has_team: {
+        Args: {
+          input_user_id: string
+        }
+        Returns: void
+      }
+      update_task_positions: {
+        Args: {
+          task_positions: {
+            id: string
+            position: number
+          }[]
+        }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never

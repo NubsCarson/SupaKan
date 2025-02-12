@@ -5,15 +5,8 @@ export type Task = Database['public']['Tables']['tasks']['Row'];
 export type Board = Database['public']['Tables']['boards']['Row'];
 
 // Helper to transform task data
-function transformTask(task: any): Task {
-  return {
-    ...task,
-    due_date: task.due_date || null,
-    description: task.description || null,
-    assigned_to: task.assigned_to || null,
-    estimated_hours: task.estimated_hours || null,
-    labels: task.labels || [],
-  };
+function transformTask(task: Database['public']['Tables']['tasks']['Row']): Task {
+  return task;
 }
 
 // Helper function to generate ticket IDs

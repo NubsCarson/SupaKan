@@ -11,21 +11,15 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
-import { getTasks, updateTask, updateTaskPositions } from '@/lib/boards';
+import { getTasks, updateTask, updateTaskPositions, getBoard } from '@/lib/boards';
+import { useParams, useNavigate } from 'react-router-dom';
 
 type Task = Database['public']['Tables']['tasks']['Row'];
-type TaskStatus = Task['status'];
+type Board = Database['public']['Tables']['boards']['Row'];
 
 // Transform database task to our Task type
-function transformTask(task: any): Task {
-  return {
-    ...task,
-    due_date: task.due_date || null,
-    description: task.description || null,
-    assigned_to: task.assigned_to || null,
-    estimated_hours: task.estimated_hours || null,
-    labels: task.labels || [],
-  };
+function transformTask(task: Database['public']['Tables']['tasks']['Row']): Task {
+  return task;
 }
 
 const columns = [
@@ -38,39 +32,64 @@ const columns = [
 
 export function Board() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [board, setBoard] = useState<Board | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { user } = useAuth();
+  const { id: boardId } = useParams();
+  const navigate = useNavigate();
 
   const loadTasks = useCallback(async () => {
+    if (!boardId) {
+      navigate('/boards');
+      return;
+    }
+
     try {
-      const tasks = await getTasks();
-      setTasks(tasks);
+      const [boardData, tasksData] = await Promise.all([
+        getBoard(boardId),
+        getTasks(boardId)
+      ]);
+      
+      if (!boardData) {
+        toast({
+          title: 'Error',
+          description: 'Board not found',
+          variant: 'destructive',
+        });
+        navigate('/boards');
+        return;
+      }
+
+      setBoard(boardData);
+      setTasks(tasksData.map(transformTask));
       setIsLoading(false);
     } catch (error) {
-      console.error('Failed to load tasks:', error);
+      console.error('Failed to load board data:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load tasks. Please try refreshing the page.',
+        description: 'Failed to load board data. Please try refreshing the page.',
         variant: 'destructive',
       });
+      navigate('/boards');
     }
-  }, []);
+  }, [boardId, navigate]);
 
   useEffect(() => {
     loadTasks();
 
     // Subscribe to task changes
     const channel = supabase
-      .channel('tasks')
+      .channel(`board_tasks:${boardId}`)
       .on('postgres_changes', 
         { 
           event: '*', 
           schema: 'public', 
-          table: 'tasks' 
+          table: 'tasks',
+          filter: `board_id=eq.${boardId}`
         }, 
         () => {
           loadTasks();
@@ -81,7 +100,7 @@ export function Board() {
     return () => {
       channel.unsubscribe();
     };
-  }, [loadTasks]);
+  }, [loadTasks, boardId]);
 
   const onDragStart = () => {
     setIsDragging(true);
@@ -194,7 +213,7 @@ export function Board() {
       // First update the status if it changed
       if (source.droppableId !== destination.droppableId) {
         await updateTask(draggableId, { 
-          status: destination.droppableId as TaskStatus 
+          status: destination.droppableId as Task['status'] 
         });
       }
 
@@ -255,7 +274,9 @@ export function Board() {
     <div className="flex flex-col h-[calc(100vh-7.5rem)]">
       <div className="flex flex-col gap-4 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Project Board</h1>
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+            {board?.name || 'Loading...'}
+          </h1>
           <div className="text-sm text-muted-foreground">
             {completedTasks} of {totalTasks} tasks completed ({completionRate}%)
           </div>
@@ -391,8 +412,8 @@ export function Board() {
         onOpenChange={setIsTaskDialogOpen}
         task={selectedTask}
         onTaskSaved={loadTasks}
-        boardId={tasks[0]?.board_id}
-        teamId={tasks[0]?.team_id}
+        boardId={board?.id}
+        teamId={board?.team_id}
       />
     </div>
   );
