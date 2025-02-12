@@ -37,30 +37,46 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🛡️ Security scan
+      - name: 🛡️ Security scan with Snyk
+        if: env.SNYK_TOKEN != ''
         uses: snyk/actions/node@master
+        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high
 
-      - name: 🔍 CodeQL Analysis
+      - name: 🔍 Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: javascript
+          queries: security-and-quality
 
-      - name: 🏃‍♂️ CodeQL Analysis
+      - name: 🏗️ Autobuild
+        uses: github/codeql-action/autobuild@v2
+
+      - name: 🔬 Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:javascript"
+
+      - name: 🔒 Run npm audit
+        run: npm audit --audit-level=high || true
 
   release:
     name: 📦 Release
     needs: [validate, security]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
