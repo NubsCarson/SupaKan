@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Plus, Loader2, Users, Crown, Settings, Mail, Copy, Check, UserPlus, Shield, LogOut } from 'lucide-react';
+import { Plus, Loader2, Users, Crown, Settings, Mail, Copy, Check, UserPlus, Shield, LogOut, Calendar, User } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { Database } from '@/lib/database.types';
@@ -46,6 +46,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
+import { Badge } from "@/components/ui/badge";
 
 type TeamMember = Database['public']['Views']['team_members_with_users']['Row'];
 interface TeamMemberResponse {
@@ -700,46 +701,75 @@ export default function TeamsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+          <span className="text-lg font-medium">Loading teams...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Teams</h1>
-          <p className="text-muted-foreground">
-            Manage your teams and team members
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button onClick={() => setIsJoinDialogOpen(true)} variant="outline">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Join Team
-          </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Team
-          </Button>
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
+      {/* Hero Section */}
+      <div className="relative mb-8 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-background p-8">
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] dark:bg-grid-black/10" />
+        <div className="relative">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                <Users className="h-8 w-8 text-primary" />
+                Teams
+              </h1>
+              <p className="text-muted-foreground max-w-[600px]">
+                Collaborate with your team members and manage projects together
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setIsJoinDialogOpen(true)} variant="outline">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Join Team
+              </Button>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Create Team
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Badge variant="outline" className="bg-primary/10 inline-flex items-center">
+              <span className="truncate">{teams.length} Total Teams</span>
+            </Badge>
+            <Badge variant="outline" className="bg-green-500/10 text-green-500 inline-flex items-center">
+              <span className="truncate">{teams.filter(t => t.is_owner).length} Owned Teams</span>
+            </Badge>
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 inline-flex items-center">
+              <span className="truncate">{teams.reduce((acc, team) => acc + team.members.length, 0)} Total Members</span>
+            </Badge>
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 inline-flex items-center">
+              <span className="truncate">{teams.filter(t => !t.is_owner).length} Member Teams</span>
+            </Badge>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Teams Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {teams.map((team) => (
-          <Card key={team.id} className="flex flex-col">
+          <Card key={team.id} className="flex flex-col transition-all hover:shadow-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5 text-primary" />
                   {team.name}
                 </CardTitle>
                 {team.is_owner && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="hover:bg-muted">
                         <Settings className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -749,40 +779,47 @@ export default function TeamsPage() {
                           setSelectedTeam(team);
                           setIsInviteDialogOpen(true);
                         }}
+                        className="gap-2"
                       >
-                        <UserPlus className="mr-2 h-4 w-4" />
+                        <UserPlus className="h-4 w-4" />
                         Invite Members
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
+                        className="text-destructive focus:text-destructive gap-2"
                         onClick={() => {
                           setSelectedTeam(team);
                           setIsDeleteTeamDialogOpen(true);
                         }}
                       >
-                        <LogOut className="mr-2 h-4 w-4" />
+                        <LogOut className="h-4 w-4" />
                         Delete Team
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
               </div>
-              <CardDescription>
+              <CardDescription className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
                 Created {new Date(team.created_at).toLocaleDateString()}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
               <div className="space-y-4">
-                <div className="text-sm font-medium">Members</div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium">Members</div>
+                  <Badge variant="secondary" className="text-xs">
+                    {team.members.length} {team.members.length === 1 ? 'member' : 'members'}
+                  </Badge>
+                </div>
                 <div className="space-y-2">
                   {team.members.map((member) => (
                     <div
                       key={member.id}
-                      className="flex items-center justify-between rounded-md border p-2"
+                      className="flex items-center justify-between rounded-lg border bg-card p-2 transition-colors hover:bg-muted/50"
                     >
                       <div className="flex items-center gap-2">
-                        <Avatar>
-                          <AvatarFallback>
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10">
                             {member.user_email.substring(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
@@ -804,35 +841,40 @@ export default function TeamsPage() {
                       {team.is_owner && member.user_id !== user?.id && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
                               <Settings className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>
-                                <Shield className="mr-2 h-4 w-4" />
+                              <DropdownMenuSubTrigger className="gap-2">
+                                <Shield className="h-4 w-4" />
                                 Change Role
                               </DropdownMenuSubTrigger>
                               <DropdownMenuPortal>
                                 <DropdownMenuSubContent>
                                   <DropdownMenuItem
                                     onClick={() => handleUpdateMemberRole(member.id, team.id, 'admin')}
+                                    className="gap-2"
                                   >
+                                    <Shield className="h-4 w-4" />
                                     Make Admin
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleUpdateMemberRole(member.id, team.id, 'member')}
+                                    className="gap-2"
                                   >
+                                    <User className="h-4 w-4" />
                                     Make Member
                                   </DropdownMenuItem>
                                 </DropdownMenuSubContent>
                               </DropdownMenuPortal>
                             </DropdownMenuSub>
                             <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
+                              className="text-destructive focus:text-destructive gap-2"
                               onClick={() => handleRemoveMember(member.id, team.id)}
                             >
+                              <LogOut className="h-4 w-4" />
                               Remove Member
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -847,7 +889,7 @@ export default function TeamsPage() {
               <CardFooter className="pt-4">
                 <Button
                   variant="outline"
-                  className="w-full text-destructive hover:bg-destructive/90 hover:text-destructive-foreground"
+                  className="w-full text-destructive hover:bg-destructive hover:text-destructive-foreground"
                   onClick={() => {
                     setSelectedTeam(team);
                     setIsLeaveTeamDialogOpen(true);
@@ -862,9 +904,25 @@ export default function TeamsPage() {
         ))}
 
         {teams.length === 0 && (
-          <div className="col-span-full text-center text-muted-foreground">
-            No teams found. Create your first team or join an existing one!
-          </div>
+          <Card className="col-span-full p-8">
+            <div className="flex flex-col items-center justify-center text-center">
+              <Users className="h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">No teams found</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create your first team or join an existing one to get started!
+              </p>
+              <div className="mt-4 flex gap-2">
+                <Button onClick={() => setIsJoinDialogOpen(true)} variant="outline">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Join Team
+                </Button>
+                <Button onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Team
+                </Button>
+              </div>
+            </div>
+          </Card>
         )}
       </div>
 

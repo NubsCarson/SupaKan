@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Footer } from '@/components/footer';
-import { Github, Gauge, LogOut, Settings, User, ChevronDown, LayoutGrid, Users } from 'lucide-react';
+import { Github, Gauge, LogOut, Settings, User, ChevronDown, Home, Users, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -38,6 +38,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import BoardsPage from '@/pages/boards';
 import TeamsPage from '@/pages/teams';
+import BoardPage from '@/pages/board';
+import AIPage from '@/pages/ai';
 
 function LoadingSpinner() {
   return (
@@ -113,10 +115,10 @@ function Layout() {
                 <Link 
                   to="/boards" 
                   className="transition-colors hover:text-foreground/80 flex items-center gap-2"
-                  title="My Boards"
+                  title="Home"
                 >
-                  <LayoutGrid className="h-5 w-5" />
-                  <span className="hidden sm:inline-block">Boards</span>
+                  <Home className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">Home</span>
                 </Link>
                 <Link 
                   to="/teams" 
@@ -133,6 +135,14 @@ function Layout() {
                 >
                   <Gauge className="h-5 w-5" />
                   <span className="hidden sm:inline-block">Dashboard</span>
+                </Link>
+                <Link 
+                  to="/ai" 
+                  className="transition-colors hover:text-foreground/80 flex items-center gap-2"
+                  title="AI Assistant"
+                >
+                  <Sparkles className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">AI Assistant</span>
                 </Link>
               </nav>
             )}
@@ -239,6 +249,7 @@ const router = createBrowserRouter(
       <Route path="board/:id" element={<ProtectedRoute><Board /></ProtectedRoute>} />
       <Route path="teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
       <Route path="dashboard" element={<ProtectedRoute><SystemDashboard /></ProtectedRoute>} />
+      <Route path="ai" element={<ProtectedRoute><AIPage /></ProtectedRoute>} />
       <Route path="auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/boards" replace />} />
     </Route>

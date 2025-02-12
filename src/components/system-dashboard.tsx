@@ -54,7 +54,7 @@ interface PerformanceMetrics {
 }
 
 export function SystemDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'messages' | 'analytics' | 'raw' | 'developer'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'messages' | 'analytics' | 'raw' | 'developer' | 'settings'>('overview');
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [dbStats, setDbStats] = useState<DBStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -261,62 +261,95 @@ export function SystemDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
         <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading dashboard...</span>
+          <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-primary"></div>
+          <span className="text-lg font-medium">Loading dashboard...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">System Dashboard</h1>
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
+      {/* Hero Section */}
+      <div className="relative mb-8 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-background p-8">
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] dark:bg-grid-black/10" />
+        <div className="relative">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                <Gauge className="h-8 w-8 text-primary" />
+                Dashboard
+              </h1>
+              <p className="text-muted-foreground max-w-[600px]">
+                Monitor your system performance and task management metrics
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => loadAllData()} variant="outline" className="gap-2">
+                <RefreshCcw className="h-4 w-4" />
+                Refresh Data
+              </Button>
+              <Select value={refreshInterval.toString()} onValueChange={(value) => setRefreshInterval(parseInt(value))}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Auto-refresh interval" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5000">Every 5 seconds</SelectItem>
+                  <SelectItem value="10000">Every 10 seconds</SelectItem>
+                  <SelectItem value="30000">Every 30 seconds</SelectItem>
+                  <SelectItem value="60000">Every minute</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Badge variant="outline" className="bg-primary/10 inline-flex items-center">
+              <span className="truncate">{metrics?.total || 0} Total Tasks</span>
+            </Badge>
+            <Badge variant="outline" className="bg-green-500/10 text-green-500 inline-flex items-center">
+              <span className="truncate">{metrics?.completed || 0} Completed</span>
+            </Badge>
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 inline-flex items-center">
+              <span className="truncate">{metrics?.inProgress || 0} In Progress</span>
+            </Badge>
+            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 inline-flex items-center">
+              <span className="truncate">{metrics?.messageCount || 0} Messages</span>
+            </Badge>
+          </div>
         </div>
-        <Button onClick={loadAllData} disabled={refreshing}>
-          <RefreshCcw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
-          Refresh
-        </Button>
       </div>
 
-      {/* Enhanced Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
+      <Tabs defaultValue="overview" className="space-y-4">
         <TabsList className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-          <TabsTrigger value="overview" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="overview" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <Gauge className="mr-2 h-4 w-4" />
             Overview
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="tasks" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <ListTodo className="mr-2 h-4 w-4" />
             Tasks
           </TabsTrigger>
-          <TabsTrigger value="messages" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="messages" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <MessageSquare className="mr-2 h-4 w-4" />
             Messages
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="analytics" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <LineChart className="mr-2 h-4 w-4" />
             Analytics
           </TabsTrigger>
-          <TabsTrigger value="raw" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="raw" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <FileJson className="mr-2 h-4 w-4" />
             Raw Data
           </TabsTrigger>
-          <TabsTrigger value="developer" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="developer" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <Terminal className="mr-2 h-4 w-4" />
             Developer
           </TabsTrigger>
-          <TabsTrigger value="settings" className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+          <TabsTrigger value="settings" className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </TabsTrigger>
@@ -326,12 +359,13 @@ export function SystemDashboard() {
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {/* Task Stats */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <Card className="bg-primary/5 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-                <ListTodo className="h-4 w-4 text-muted-foreground" />
+                <ListTodo className="absolute right-4 top-4 h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative">
                 <div className="text-2xl font-bold">{metrics?.total || 0}</div>
                 <Progress 
                   value={dbStats?.completionRate || 0} 
@@ -348,43 +382,35 @@ export function SystemDashboard() {
               </CardContent>
             </Card>
 
-            {/* Board Stats */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Board Stats</CardTitle>
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+            {/* Activity Stats */}
+            <Card className="bg-primary/5 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Activity</CardTitle>
+                <Activity className="absolute right-4 top-4 h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {tasks.filter(t => t.status !== 'done').length > 0 ? 
-                        tasks.filter(t => t.status !== 'done').length : 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Active Boards
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold">
-                      {tasks.filter(t => t.status === 'done').length > 0 ?
-                        tasks.filter(t => t.status === 'done').length : 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Empty Boards
-                    </p>
-                  </div>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold">
+                  {dbStats?.completionRate.toFixed(1)}%
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Overall Completion Rate
+                </p>
+                <Progress 
+                  value={dbStats?.completionRate || 0} 
+                  className="mt-2"
+                />
               </CardContent>
             </Card>
 
             {/* Task Distribution */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <Card className="bg-primary/5 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
+              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium">Task Distribution</CardTitle>
-                <PieChart className="h-4 w-4 text-muted-foreground" />
+                <PieChart className="absolute right-4 top-4 h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="text-2xl font-bold">
@@ -406,29 +432,29 @@ export function SystemDashboard() {
               </CardContent>
             </Card>
 
-            {/* Activity Stats */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Activity</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
+            {/* Messages Stats */}
+            <Card className="bg-primary/5 overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Messages</CardTitle>
+                <MessageSquare className="absolute right-4 top-4 h-4 w-4 text-muted-foreground" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {dbStats?.completionRate.toFixed(1)}%
-                </div>
+              <CardContent className="relative">
+                <div className="text-2xl font-bold">{messages.length}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Overall Completion Rate
+                  Total Messages
                 </p>
-                <Progress 
-                  value={dbStats?.completionRate || 0} 
-                  className="mt-2"
-                />
+                <div className="mt-2 flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-blue-500/10 text-blue-500">
+                    {messages.filter(m => new Date(m.created_at) > subDays(new Date(), 7)).length} this week
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Detailed Stats Card */}
-          <Card>
+          <Card className="bg-card">
             <CardHeader>
               <CardTitle>Detailed Statistics</CardTitle>
               <CardDescription>Comprehensive view of system metrics</CardDescription>
@@ -436,7 +462,10 @@ export function SystemDashboard() {
             <CardContent>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Task Status</h4>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <ListTodo className="h-4 w-4" />
+                    Task Status
+                  </h4>
                   <div className="grid gap-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Backlog</span>
@@ -458,7 +487,10 @@ export function SystemDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Priority Distribution</h4>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Priority Distribution
+                  </h4>
                   <div className="grid gap-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">High Priority</span>
@@ -476,7 +508,10 @@ export function SystemDashboard() {
                 </div>
 
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Task Assignment</h4>
+                  <h4 className="text-sm font-medium flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Task Assignment
+                  </h4>
                   <div className="grid gap-1">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Assigned Tasks</span>
@@ -501,31 +536,69 @@ export function SystemDashboard() {
         <TabsContent value="tasks" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Tasks</CardTitle>
-              <CardDescription>Latest tasks in the system</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Tasks</CardTitle>
+                  <CardDescription>Latest tasks in the system</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Search tasks..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-[200px]"
+                  />
+                  <Select value={filterStatus || 'all'} onValueChange={(value) => setFilterStatus(value === 'all' ? null : value)}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Filter by status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="backlog">Backlog</SelectItem>
+                      <SelectItem value="todo">Todo</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="in_review">In Review</SelectItem>
+                      <SelectItem value="done">Done</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-4">
-                  {tasks.slice(0, 10).map((task) => (
-                    <div
-                      key={task.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div className="space-y-1">
-                        <h4 className="text-sm font-medium">{task.title}</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Created {format(new Date(task.created_at), 'MMM dd, yyyy')}
-                        </p>
+                  {tasks
+                    .filter(task => 
+                      task.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                      (!filterStatus || task.status === filterStatus)
+                    )
+                    .slice(0, 10)
+                    .map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                      >
+                        <div className="space-y-1">
+                          <h4 className="text-sm font-medium">{task.title}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            Created {format(new Date(task.created_at), 'MMM dd, yyyy')}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {task.priority === 'high' && (
+                            <Badge variant="secondary" className="bg-red-500/10 text-red-500">
+                              High Priority
+                            </Badge>
+                          )}
+                          <Badge variant={
+                            task.status === 'done' ? 'default' :
+                            task.status === 'in_progress' ? 'secondary' : 'outline'
+                          }>
+                            {task.status}
+                          </Badge>
+                        </div>
                       </div>
-                      <Badge variant={
-                        task.status === 'done' ? 'default' :
-                        task.status === 'in_progress' ? 'secondary' : 'outline'
-                      }>
-                        {task.status}
-                      </Badge>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -542,15 +615,15 @@ export function SystemDashboard() {
             <CardContent>
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-4">
-                  {messages.slice(0, 10).map((message) => (
+                  {sortMessages(messages).slice(0, 10).map((message) => (
                     <div
                       key={message.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
+                      className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
                     >
                       <div className="space-y-1">
-                        <p className="text-sm">{message.content}</p>
+                        <h4 className="text-sm font-medium">{message.content}</h4>
                         <p className="text-xs text-muted-foreground">
-                          Sent {format(new Date(message.created_at), 'MMM dd, HH:mm')}
+                          {format(new Date(message.created_at), 'MMM dd, yyyy HH:mm')}
                         </p>
                       </div>
                     </div>
@@ -564,7 +637,7 @@ export function SystemDashboard() {
         {/* Analytics Tab */}
         <TabsContent value="analytics" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+            <Card className="bg-card">
               <CardHeader>
                 <CardTitle>Task Completion Rate</CardTitle>
                 <CardDescription>
@@ -583,7 +656,7 @@ export function SystemDashboard() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="bg-card">
               <CardHeader>
                 <CardTitle>Task Distribution</CardTitle>
                 <CardDescription>
@@ -746,9 +819,10 @@ export function SystemDashboard() {
                     <SelectValue placeholder="Select refresh interval" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="15000">15 seconds</SelectItem>
-                    <SelectItem value="30000">30 seconds</SelectItem>
-                    <SelectItem value="60000">1 minute</SelectItem>
+                    <SelectItem value="5000">Every 5 seconds</SelectItem>
+                    <SelectItem value="15000">Every 15 seconds</SelectItem>
+                    <SelectItem value="30000">Every 30 seconds</SelectItem>
+                    <SelectItem value="60000">Every minute</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
