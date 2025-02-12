@@ -1,0 +1,50 @@
+# These owners will be the default owners for everything in the repo
+* @NubsCarson
+
+# Frontend Core
+/src/components/ @NubsCarson
+/src/pages/ @NubsCarson
+/src/styles/ @NubsCarson
+/src/hooks/ @NubsCarson
+/src/lib/ @NubsCarson
+/src/stores/ @NubsCarson
+/src/types/ @NubsCarson
+/src/utils/ @NubsCarson
+
+# Backend and Database
+/supabase/ @NubsCarson
+/migrations/ @NubsCarson
+/prisma/ @NubsCarson
+/api/ @NubsCarson
+
+# Testing
+/tests/ @NubsCarson
+/cypress/ @NubsCarson
+/e2e/ @NubsCarson
+/__tests__/ @NubsCarson
+*.test.ts @NubsCarson
+*.test.tsx @NubsCarson
+*.spec.ts @NubsCarson
+*.spec.tsx @NubsCarson
+
+# Documentation
+/docs/ @NubsCarson
+*.md @NubsCarson
+
+# Configuration and Build
+*.json @NubsCarson
+*.yml @NubsCarson
+*.yaml @NubsCarson
+*.config.* @NubsCarson
+/scripts/ @NubsCarson
+/.github/ @NubsCarson
+/.husky/ @NubsCarson
+/docker/ @NubsCarson
+
+# Assets and Public Files
+/public/ @NubsCarson
+/assets/ @NubsCarson
+*.svg @NubsCarson
+*.png @NubsCarson
+*.jpg @NubsCarson
+*.ico @NubsCarson 

@@ -10,6 +10,8 @@ A modern task management platform built **100% on Supabase** - no additional bac
 - **Instant Real-time Updates** - Everything syncs automatically
 - **Works Solo or Team** - Scale from personal use to full team collaboration
 - **No Extra Services** - Chat, tasks, and collaboration all in one place
+- **Smart AI Assistant** - Get insights and help with your tasks
+- **System Dashboard** - Monitor your project's health and metrics
 
 ## ✨ Key Features
 
@@ -17,7 +19,7 @@ A modern task management platform built **100% on Supabase** - no additional bac
   - Tasks update instantly across all users
   - Live team chat with instant message delivery
   - Real-time notifications for mentions and updates
-  - See who's online and typing indicators
+  - See who's online with typing indicators
   
 - 📋 **Smart Task Management**:
   - Drag-and-drop Kanban board
@@ -25,6 +27,7 @@ A modern task management platform built **100% on Supabase** - no additional bac
   - Rich text task descriptions
   - Custom labels and priorities
   - Due dates and time tracking
+  - Keyboard shortcuts for quick actions
   
 - 💬 **Built-in Team Chat**:
   - Instant message delivery
@@ -33,11 +36,26 @@ A modern task management platform built **100% on Supabase** - no additional bac
   - Thread discussions
   - Mention team members
   
-- 👥 **Flexible Usage Modes**:
-  - Personal task management
-  - Small team collaboration
-  - Large team organization
-  - Custom team permissions
+- 📊 **System Dashboard**:
+  - Real-time task metrics
+  - Team activity monitoring
+  - Performance analytics
+  - System health monitoring
+  - Data export capabilities
+  
+- 🤖 **AI Assistant**:
+  - Task analysis and insights
+  - Productivity recommendations
+  - Workload summaries
+  - Priority management help
+  - Custom GPT integration
+  
+- ⌨️ **Keyboard Shortcuts**:
+  - Quick board creation
+  - Fast search access
+  - Help menu toggle
+  - Modal management
+  - Efficient navigation
 
 ## 🚀 Built on Supabase
 
@@ -58,6 +76,7 @@ Everything runs on Supabase's powerful features:
   - Shadcn/ui
   - TipTap Editor
   - React Beautiful DND
+  - OpenAI Integration
 
 - **Backend (All Supabase):**
   - PostgreSQL Database
@@ -73,6 +92,7 @@ Everything runs on Supabase's powerful features:
 - Node.js (v16+)
 - npm or yarn
 - Supabase account
+- OpenAI API key (optional, for AI features)
 
 ### Setup in 4 Steps
 
@@ -93,6 +113,7 @@ Everything runs on Supabase's powerful features:
    ```bash
    cp .env.example .env
    # Edit .env with your Supabase credentials
+   # Add OpenAI API key if using AI features
    ```
 
 4. Start developing:
@@ -109,15 +130,20 @@ src/
 ├── components/        # React components
 │   ├── kanban/       # Board & task components
 │   ├── chat/         # Real-time chat components
+│   ├── system/       # Dashboard components
 │   └── ui/           # Shared UI components
 ├── lib/              # Supabase & utility functions
 ├── hooks/            # React hooks
+├── pages/            # Page components
+├── routes/           # Route definitions
+├── stores/           # State management
 └── types/            # TypeScript definitions
 ```
 
 ## 🔧 Development Commands
 
 ```bash
+# Development
 npm run dev          # Start development
 npm run build        # Production build
 npm run preview      # Preview build
@@ -125,10 +151,12 @@ npm run lint         # Lint code
 npm run typecheck    # Type checking
 npm run clean        # Clean build files
 
+
 # Supabase Commands
-npm run supabase:start    # Start local Supabase
-npm run supabase:stop     # Stop local Supabase
-npm run supabase:db-reset # Reset database
+npm run supabase:start           # Start local Supabase
+npm run supabase:stop            # Stop local Supabase
+npm run supabase:db-reset        # Reset database
+npm run supabase:generate-types  # Generate TypeScript types
 ```
 
 ## 🚀 Deployment
@@ -143,6 +171,7 @@ npm run supabase:db-reset # Reset database
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    VITE_APP_URL=your_vercel_url
+   VITE_OPENAI_API_KEY=your_openai_api_key (optional)
    ```
 5. Deploy!
 
@@ -163,7 +192,8 @@ MIT License - See [LICENSE](LICENSE)
 - [TipTap](https://tiptap.dev/) - Rich text editing
 - [React Beautiful DND](https://github.com/atlassian/react-beautiful-dnd) - Smooth drag and drop
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [Vite](https://vitejs.dev/) - Build tool 
+- [Vite](https://vitejs.dev/) - Build tool
+- [OpenAI](https://openai.com/) - AI capabilities
 
 ---
 <div align="center">
