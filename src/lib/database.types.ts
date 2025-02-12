@@ -198,6 +198,17 @@ export interface Database {
           message_user: Json
         }
       }
+      team_members_with_users: {
+        Row: {
+          id: string
+          team_id: string
+          user_id: string
+          role: 'owner' | 'admin' | 'member' | 'guest'
+          created_at: string
+          updated_at: string
+          user_email: string
+        }
+      }
     }
     Functions: {
       ensure_user_has_team: {

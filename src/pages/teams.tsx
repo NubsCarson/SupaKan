@@ -6,15 +6,17 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Plus, Loader2, Users, Crown, Settings } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import type { Database } from '@/lib/database.types';
 
-interface TeamMember {
-  id: string;
-  role: string;
-  user: {
+type TeamMember = Database['public']['Views']['team_members_with_users']['Row'];
+type TeamMemberResponse = Database['public']['Tables']['team_members']['Row'] & {
+  teams: {
     id: string;
-    email: string;
+    name: string;
+    created_at: string;
+    created_by: string;
   };
-}
+};
 
 interface Team {
   id: string;
@@ -22,17 +24,6 @@ interface Team {
   created_at: string;
   members: TeamMember[];
   is_owner: boolean;
-}
-
-interface TeamResponse {
-  team_id: string;
-  role: string;
-  teams: {
-    id: string;
-    name: string;
-    created_at: string;
-    created_by: string;
-  };
 }
 
 export default function TeamsPage() {
@@ -46,6 +37,7 @@ export default function TeamsPage() {
 
   async function loadTeams() {
     try {
+      // First get the teams the user is a member of
       const { data: memberTeams, error: memberError } = await supabase
         .from('team_members')
         .select(`
@@ -64,19 +56,12 @@ export default function TeamsPage() {
 
       if (!memberTeams) return;
 
-      // For each team, get its members
+      // For each team, get its members using the view
       const teamsWithMembers = await Promise.all(
-        (memberTeams as TeamResponse[]).map(async (teamData) => {
+        (memberTeams as TeamMemberResponse[]).map(async (teamData) => {
           const { data: members, error: membersError } = await supabase
-            .from('team_members')
-            .select(`
-              id,
-              role,
-              user:users!inner (
-                id,
-                email
-              )
-            `)
+            .from('team_members_with_users')
+            .select('*')
             .eq('team_id', teamData.team_id);
 
           if (membersError) throw membersError;
@@ -195,12 +180,12 @@ export default function TeamsPage() {
                       <div className="flex items-center gap-2">
                         <Avatar>
                           <AvatarFallback>
-                            {member.user.email.substring(0, 2).toUpperCase()}
+                            {member.user_email.substring(0, 2).toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="text-sm font-medium">
-                            {member.user.email}
+                            {member.user_email}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {member.role}

@@ -10,6 +10,8 @@ DROP TABLE IF EXISTS boards CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TYPE IF EXISTS task_position_update;
+DROP VIEW IF EXISTS messages_with_users;
+DROP VIEW IF EXISTS team_members_with_users;
 
 -- Create teams table
 CREATE TABLE teams (
@@ -88,6 +90,14 @@ SELECT
     ) as message_user
 FROM messages m
 LEFT JOIN auth.users u ON m.user_id = u.id;
+
+-- Create team members view
+CREATE VIEW team_members_with_users AS
+SELECT 
+    tm.*,
+    u.email as user_email
+FROM team_members tm
+JOIN auth.users u ON tm.user_id = u.id;
 
 -- Create indexes
 CREATE INDEX idx_teams_created_by ON teams(created_by);
@@ -377,17 +387,13 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Team access" ON teams;
 DROP POLICY IF EXISTS "Team members select" ON team_members;
 DROP POLICY IF EXISTS "Team members insert" ON team_members;
+DROP POLICY IF EXISTS "Team members update" ON team_members;
 DROP POLICY IF EXISTS "Team members delete" ON team_members;
 DROP POLICY IF EXISTS "Board access" ON boards;
 DROP POLICY IF EXISTS "Task access" ON tasks;
 DROP POLICY IF EXISTS "Message access" ON messages;
 
--- Team access policies
-CREATE POLICY "Team access" ON teams FOR ALL USING (
-    created_by = auth.uid()
-);
-
--- Team members access policies - split by operation
+-- Team members access policies
 CREATE POLICY "Team members select" ON team_members 
     FOR SELECT USING (
         user_id = auth.uid()
@@ -397,7 +403,7 @@ CREATE POLICY "Team members insert" ON team_members
     FOR INSERT WITH CHECK (
         EXISTS (
             SELECT 1 FROM teams t
-            WHERE t.id = team_id
+            WHERE t.id = team_members.team_id
             AND t.created_by = auth.uid()
         )
     );
@@ -406,7 +412,7 @@ CREATE POLICY "Team members update" ON team_members
     FOR UPDATE USING (
         EXISTS (
             SELECT 1 FROM teams t
-            WHERE t.id = team_id
+            WHERE t.id = team_members.team_id
             AND t.created_by = auth.uid()
         )
     );
@@ -415,28 +421,155 @@ CREATE POLICY "Team members delete" ON team_members
     FOR DELETE USING (
         EXISTS (
             SELECT 1 FROM teams t
-            WHERE t.id = team_id
+            WHERE t.id = team_members.team_id
             AND t.created_by = auth.uid()
         )
     );
 
--- Board access policy
-CREATE POLICY "Board access" ON boards FOR ALL USING (
-    created_by = auth.uid()
-);
+-- Team access policies
+CREATE POLICY "Team select" ON teams 
+    FOR SELECT USING (
+        created_by = auth.uid() OR
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = teams.id
+            AND tm.user_id = auth.uid()
+        )
+    );
 
--- Task access policy
-CREATE POLICY "Task access" ON tasks FOR ALL USING (
-    created_by = auth.uid()
-);
+CREATE POLICY "Team insert" ON teams 
+    FOR INSERT WITH CHECK (
+        created_by = auth.uid()
+    );
 
--- Message access policy
-CREATE POLICY "Message access" ON messages FOR ALL USING (
-    user_id = auth.uid()
-);
+CREATE POLICY "Team update" ON teams 
+    FOR UPDATE USING (
+        created_by = auth.uid()
+    );
+
+CREATE POLICY "Team delete" ON teams 
+    FOR DELETE USING (
+        created_by = auth.uid()
+    );
+
+-- Board access policies
+CREATE POLICY "Board select" ON boards 
+    FOR SELECT USING (
+        created_by = auth.uid() OR
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = boards.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Board insert" ON boards 
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = boards.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Board update" ON boards 
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = boards.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Board delete" ON boards 
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = boards.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+-- Task access policies
+CREATE POLICY "Task select" ON tasks 
+    FOR SELECT USING (
+        created_by = auth.uid() OR
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = tasks.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Task insert" ON tasks 
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = tasks.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Task update" ON tasks 
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = tasks.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Task delete" ON tasks 
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = tasks.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+-- Message access policies
+CREATE POLICY "Message select" ON messages 
+    FOR SELECT USING (
+        user_id = auth.uid() OR
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = messages.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Message insert" ON messages 
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = messages.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Message update" ON messages 
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = messages.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Message delete" ON messages 
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.team_id = messages.team_id
+            AND tm.user_id = auth.uid()
+        )
+    );
 
 -- Grant necessary permissions
 GRANT USAGE ON SCHEMA public TO postgres, authenticated, anon;
+GRANT USAGE ON SCHEMA auth TO postgres, authenticated, anon;
+GRANT SELECT ON auth.users TO postgres, authenticated, anon;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
@@ -449,17 +582,6 @@ GRANT EXECUTE ON FUNCTION ensure_user_has_team(UUID) TO postgres, authenticated,
 GRANT EXECUTE ON FUNCTION trigger_ensure_user_has_team() TO postgres, authenticated, anon;
 GRANT EXECUTE ON FUNCTION update_updated_at_column() TO postgres, authenticated, anon;
 GRANT EXECUTE ON FUNCTION update_task_positions(task_position_update[]) TO authenticated;
-
--- Ensure auth trigger has access to auth schema
-GRANT USAGE ON SCHEMA auth TO postgres, authenticated, anon;
-GRANT SELECT ON auth.users TO postgres, authenticated, anon;
-
--- Update function security
-ALTER FUNCTION ensure_user_has_team(UUID)
-SET search_path = public, auth;
-
-ALTER FUNCTION trigger_ensure_user_has_team()
-SET search_path = public, auth;
 
 -- Make sure functions are owned by postgres
 ALTER FUNCTION ensure_user_has_team(UUID) OWNER TO postgres;
