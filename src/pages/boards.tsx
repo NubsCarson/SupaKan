@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users, Keyboard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -47,6 +47,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import type { Database } from '@/lib/database.types';
 import { PROJECT_TEMPLATES, type BoardTemplate } from '@/lib/templates';
+import { createShortcuts, isInputElement } from '@/lib/keyboard-shortcuts';
+import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help';
 
 interface Board {
   id: string;
@@ -290,6 +292,40 @@ export default function BoardsPage() {
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'tasks'>('recent');
   const [filterTimeframe, setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Create shortcuts
+  const shortcuts = createShortcuts({
+    createBoard: () => setIsCreateDialogOpen(true),
+    showSearch: () => searchInputRef.current?.focus(),
+    toggleHelp: () => setIsHelpOpen(!isHelpOpen),
+    closeModal: () => {
+      setIsCreateDialogOpen(false);
+      setIsEditDialogOpen(false);
+      setIsDeleteDialogOpen(false);
+      setIsHelpOpen(false);
+    }
+  });
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      // Don't trigger shortcuts when typing in input elements
+      if (isInputElement(document.activeElement as HTMLElement)) {
+        return;
+      }
+
+      const shortcut = shortcuts.find(s => s.key.toLowerCase() === event.key.toLowerCase());
+      if (shortcut) {
+        event.preventDefault();
+        shortcut.command();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shortcuts]);
 
   useEffect(() => {
     loadBoards();
@@ -500,6 +536,12 @@ export default function BoardsPage() {
                 {tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length} overdue tasks
               </div>
             )}
+            <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer hover:bg-primary/20"
+              onClick={() => setIsHelpOpen(true)}
+            >
+              <Keyboard className="mr-1 h-3.5 w-3.5 text-primary" />
+              Press ? for shortcuts
+            </div>
           </div>
         </div>
       </div>
@@ -601,10 +643,11 @@ export default function BoardsPage() {
             <div className="relative w-full sm:w-[300px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search boards..."
+                placeholder="Search boards... (Press / to focus)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
+                ref={searchInputRef}
               />
             </div>
             <Tabs value={filterTimeframe} onValueChange={(v) => setFilterTimeframe(v as any)} className="hidden sm:block">
@@ -850,6 +893,13 @@ export default function BoardsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Keyboard Shortcuts Help Dialog */}
+      <KeyboardShortcutsHelp
+        shortcuts={shortcuts}
+        open={isHelpOpen}
+        onOpenChange={setIsHelpOpen}
+      />
     </div>
   );
 } 

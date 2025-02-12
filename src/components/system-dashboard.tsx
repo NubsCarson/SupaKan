@@ -95,6 +95,204 @@ export function SystemDashboard() {
     });
   };
 
+  const formatDate = (date: Date | string) => {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return format(d, 'PPpp');
+  };
+
+  const formatSimpleDate = (date: Date | string) => {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return format(d, 'yyyy-MM-dd');
+  };
+
+  const exportData = async (format: 'json' | 'csv' | 'markdown' | 'html') => {
+    try {
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at');
+
+      if (messagesError) throw messagesError;
+
+      const { data: tasks, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at');
+
+      if (tasksError) throw tasksError;
+
+      let exportContent: string;
+      let mimeType: string;
+      let fileExtension: string;
+
+      const data = {
+        tasks,
+        messages,
+        exportedAt: new Date().toISOString(),
+        metadata: {
+          totalTasks: tasks.length,
+          completedTasks: tasks.filter(t => t.status === 'done').length,
+          totalMessages: messages.length,
+          exportFormat: format,
+          version: '1.0.0'
+        }
+      };
+
+      switch (format) {
+        case 'json':
+          exportContent = JSON.stringify(data, null, 2);
+          mimeType = 'application/json';
+          fileExtension = 'json';
+          break;
+
+        case 'csv':
+          // Convert tasks to CSV
+          const tasksCsv = [
+            // CSV Headers
+            ['ID', 'Title', 'Description', 'Status', 'Priority', 'Created At', 'Updated At', 'Due Date', 'Assigned To', 'Labels'].join(','),
+            // CSV Data
+            ...tasks.map(task => [
+              task.id,
+              `"${task.title.replace(/"/g, '""')}"`,
+              `"${(task.description || '').replace(/"/g, '""')}"`,
+              task.status,
+              task.priority,
+              task.created_at,
+              task.updated_at,
+              task.due_date || '',
+              task.assigned_to || '',
+              `"${task.labels?.join(';') || ''}"`,
+            ].join(','))
+          ].join('\n');
+
+          exportContent = tasksCsv;
+          mimeType = 'text/csv';
+          fileExtension = 'csv';
+          break;
+
+        case 'markdown':
+          exportContent = `# SupaKan Export - ${formatSimpleDate(new Date())}
+
+## Summary
+- Total Tasks: ${tasks.length}
+- Completed Tasks: ${tasks.filter(t => t.status === 'done').length}
+- Total Messages: ${messages.length}
+- Export Date: ${formatDate(new Date())}
+
+## Tasks
+
+${tasks.map(task => `### ${task.title}
+- Status: ${task.status}
+- Priority: ${task.priority}
+- Created: ${formatDate(task.created_at)}
+${task.description ? `- Description: ${task.description}` : ''}
+${task.due_date ? `- Due Date: ${formatDate(task.due_date)}` : ''}
+${task.labels?.length ? `- Labels: ${task.labels.join(', ')}` : ''}
+`).join('\n')}
+
+## Messages
+
+${messages.map(msg => `- ${formatDate(msg.created_at)}: ${msg.content}`).join('\n')}`;
+          mimeType = 'text/markdown';
+          fileExtension = 'md';
+          break;
+
+        case 'html':
+          exportContent = `<!DOCTYPE html>
+<html>
+<head>
+  <title>SupaKan Export - ${formatSimpleDate(new Date())}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem; border: 1px solid #ddd; }
+    th { background: #f4f4f4; }
+    .task { margin-bottom: 1rem; padding: 1rem; border: 1px solid #ddd; border-radius: 4px; }
+    .message { padding: 0.5rem; border-bottom: 1px solid #eee; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .stat { padding: 1rem; background: #f4f4f4; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>SupaKan Export - ${formatDate(new Date())}</h1>
+  
+  <div class="stats">
+    <div class="stat">
+      <h3>Total Tasks</h3>
+      <p>${tasks.length}</p>
+    </div>
+    <div class="stat">
+      <h3>Completed Tasks</h3>
+      <p>${tasks.filter(t => t.status === 'done').length}</p>
+    </div>
+    <div class="stat">
+      <h3>Total Messages</h3>
+      <p>${messages.length}</p>
+    </div>
+  </div>
+
+  <h2>Tasks</h2>
+  <div class="tasks">
+    ${tasks.map(task => `
+      <div class="task">
+        <h3>${task.title}</h3>
+        <p><strong>Status:</strong> ${task.status}</p>
+        <p><strong>Priority:</strong> ${task.priority}</p>
+        <p><strong>Created:</strong> ${formatDate(task.created_at)}</p>
+        ${task.description ? `<p><strong>Description:</strong> ${task.description}</p>` : ''}
+        ${task.due_date ? `<p><strong>Due Date:</strong> ${formatDate(task.due_date)}</p>` : ''}
+        ${task.labels?.length ? `<p><strong>Labels:</strong> ${task.labels.join(', ')}</p>` : ''}
+      </div>
+    `).join('')}
+  </div>
+
+  <h2>Messages</h2>
+  <div class="messages">
+    ${messages.map(msg => `
+      <div class="message">
+        <strong>${formatDate(msg.created_at)}:</strong> ${msg.content}
+      </div>
+    `).join('')}
+  </div>
+</body>
+</html>`;
+          mimeType = 'text/html';
+          fileExtension = 'html';
+          break;
+
+        default:
+          throw new Error('Unsupported export format');
+      }
+
+      const blob = new Blob([exportContent], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kanban-export-${formatSimpleDate(new Date())}.${fileExtension}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export successful',
+        description: `Your data has been exported as ${format.toUpperCase()}.`,
+      });
+    } catch (error) {
+      console.error('Failed to export data:', error);
+      toast({
+        title: 'Export failed',
+        description: 'Failed to export data. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleExport = (format: 'json' | 'csv' | 'markdown' | 'html') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    exportData(format);
+  };
+
   async function loadAllData() {
     try {
       setRefreshing(true);
@@ -209,55 +407,6 @@ export function SystemDashboard() {
       calculatePerformanceMetrics(tasks);
     }
   }, [tasks]);
-
-  const exportData = async () => {
-    try {
-      const { data: messages, error: messagesError } = await supabase
-        .from('messages')
-        .select('*')
-        .order('created_at');
-
-      if (messagesError) throw messagesError;
-
-      const { data: tasks, error: tasksError } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at');
-
-      if (tasksError) throw tasksError;
-
-      const data = {
-        tasks,
-        messages,
-        exportedAt: new Date().toISOString(),
-      };
-
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: 'application/json',
-      });
-
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `kanban-export-${format(new Date(), 'yyyy-MM-dd')}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: 'Export successful',
-        description: 'Your data has been exported successfully.',
-      });
-    } catch (error) {
-      console.error('Failed to export data:', error);
-      toast({
-        title: 'Export failed',
-        description: 'Failed to export data. Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
 
   if (isLoading) {
     return (
@@ -707,11 +856,22 @@ export function SystemDashboard() {
         <TabsContent value="raw" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Tasks</CardTitle>
-                <CardDescription>
-                  Raw task data from the database
-                </CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div className="space-y-1">
+                  <CardTitle>Tasks</CardTitle>
+                  <CardDescription>
+                    Raw task data from the database
+                  </CardDescription>
+                </div>
+                <Button 
+                  onClick={handleExport('json')}
+                  variant="outline" 
+                  size="sm"
+                  className="gap-2"
+                >
+                  <FileJson className="h-4 w-4" />
+                  Export Data
+                </Button>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-[400px]">
@@ -776,16 +936,45 @@ export function SystemDashboard() {
                   </div>
                 </div>
                 <div>
-                  <h4 className="mb-2 text-sm font-medium">Actions</h4>
-                  <div className="grid gap-2">
+                  <h4 className="mb-2 text-sm font-medium">Export Options</h4>
+                  <div className="grid grid-cols-2 gap-2">
                     <Button
                       variant="outline" 
                       className="w-full"
-                      onClick={exportData}
+                      onClick={handleExport('json')}
                     >
-                      <DatabaseIcon className="mr-2 h-4 w-4" />
-                      Export Data
+                      <FileJson className="mr-2 h-4 w-4" />
+                      Export as JSON
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleExport('csv')}
+                    >
+                      <Table className="mr-2 h-4 w-4" />
+                      Export as CSV
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleExport('markdown')}
+                    >
+                      <Code className="mr-2 h-4 w-4" />
+                      Export as Markdown
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleExport('html')}
+                    >
+                      <Code className="mr-2 h-4 w-4" />
+                      Export as HTML
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="mb-2 text-sm font-medium">System Actions</h4>
+                  <div className="grid gap-2">
                     <Button
                       variant="outline"
                       className="w-full"
@@ -826,23 +1015,6 @@ export function SystemDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Management</CardTitle>
-              <CardDescription>Manage your dashboard data</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={exportData}
-              >
-                <DatabaseIcon className="mr-2 h-4 w-4" />
-                Export Data
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>
