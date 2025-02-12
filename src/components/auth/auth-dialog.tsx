@@ -1,6 +1,5 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
 import {
   Dialog,
   DialogContent,
@@ -8,11 +7,14 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { useTheme } from '@/components/theme-provider';
-import { Eye, EyeOff } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { Eye, EyeOff, Github, Mail } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface AuthDialogProps {
   open: boolean;
@@ -23,72 +25,92 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { theme } = useTheme();
-  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  // Add password toggle functionality
-  useEffect(() => {
-    if (open) {
-      const interval = setInterval(() => {
-        // More specific selector to find the password input
-        const passwordInputs = document.querySelectorAll('input[type="password"], input[type="text"].supabase-auth-ui_ui-input');
-        
-        passwordInputs.forEach((element) => {
-          const input = element as HTMLInputElement;
-          const inputContainer = input.parentElement;
-          if (!inputContainer) return;
+  const handleEmailAuth = async (isSignUp: boolean) => {
+    try {
+      setIsLoading(true);
+      console.log(`Attempting to ${isSignUp ? 'sign up' : 'sign in'} with email:`, email);
+      
+      const { data, error } = isSignUp 
+        ? await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback`,
+              data: {
+                email: email,
+              }
+            },
+          })
+        : await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
 
-          // Only add toggle if it doesn't exist for this input
-          if (!inputContainer.querySelector('.password-toggle')) {
-            // Set position relative on container
-            inputContainer.style.position = 'relative';
+      console.log('Auth response:', { data, error });
 
-            const toggleBtn = document.createElement('button');
-            toggleBtn.type = 'button';
-            toggleBtn.className = 'password-toggle absolute right-3 top-[60%] -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none transition-colors duration-200';
-            toggleBtn.setAttribute('aria-label', 'Toggle password visibility');
-            
-            // Set initial icon based on input type
-            const isPassword = input.type === 'password';
-            toggleBtn.innerHTML = isPassword 
-              ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'
-              : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
-
-            // Add click handler
-            toggleBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              const newType = input.type === 'password' ? 'text' : 'password';
-              input.type = newType;
-              
-              // Update icon
-              toggleBtn.innerHTML = newType === 'password' 
-                ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>'
-                : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>';
-            };
-
-            // Store ref to button for cleanup
-            toggleRef.current = toggleBtn;
-            
-            // Add button to input container
-            inputContainer.appendChild(toggleBtn);
-          }
+      if (error) {
+        console.error('Detailed auth error:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          stack: error.stack
         });
+        throw error;
+      }
 
-        // If we found and processed all password inputs, clear the interval
-        if (passwordInputs.length > 0) {
-          clearInterval(interval);
-        }
-      }, 100);
+      toast({
+        title: isSignUp ? 'Check your email' : 'Welcome back!',
+        description: isSignUp 
+          ? 'We sent you a confirmation link.' 
+          : 'You have successfully signed in.',
+      });
 
-      return () => {
-        clearInterval(interval);
-        // Clean up toggle buttons when dialog closes
-        const toggles = document.querySelectorAll('.password-toggle');
-        toggles.forEach(toggle => toggle.remove());
-      };
+      if (!isSignUp) {
+        onOpenChange(false);
+      }
+    } catch (error: any) {
+      console.error('Auth error details:', {
+        message: error.message,
+        status: error?.status,
+        name: error?.name,
+        stack: error?.stack,
+        response: error?.response
+      });
+      
+      toast({
+        title: 'Error',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [open]);
+  };
+
+  const handleOAuthSignIn = async (provider: 'github' | 'google') => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,38 +121,169 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             Sign in to your account or create a new one to get started.
           </DialogDescription>
         </DialogHeader>
-        <Auth
-          supabaseClient={supabase}
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: 'hsl(var(--primary))',
-                  brandAccent: 'hsl(var(--primary))',
-                },
-              },
-            },
-            className: {
-              container: 'w-full',
-              button: 'w-full bg-primary text-primary-foreground hover:bg-primary/90',
-              input: 'bg-background pr-10', // Added padding for the toggle button
-              label: 'text-foreground',
-            },
-          }}
-          theme={theme === 'dark' ? 'dark' : 'default'}
-          providers={['github', 'google']}
-          redirectTo={`${window.location.origin}/auth/callback`}
-          onlyThirdPartyProviders={false}
-          localization={{
-            variables: {
-              sign_in: {
-                email_label: 'Email address',
-                password_label: 'Password',
-              },
-            },
-          }}
-        />
+
+        <Tabs defaultValue="signin" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="signin">Sign In</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="signin" className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => handleEmailAuth(false)}
+                disabled={isLoading}
+              >
+                Sign In
+              </Button>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthSignIn('github')}
+                disabled={isLoading}
+              >
+                <Github className="mr-2 h-4 w-4" />
+                Github
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthSignIn('google')}
+                disabled={isLoading}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Google
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signup" className="space-y-4">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email-signup">Email</Label>
+                <Input
+                  id="email-signup"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password-signup">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password-signup"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => handleEmailAuth(true)}
+                disabled={isLoading}
+              >
+                Sign Up
+              </Button>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthSignIn('github')}
+                disabled={isLoading}
+              >
+                <Github className="mr-2 h-4 w-4" />
+                Github
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleOAuthSignIn('google')}
+                disabled={isLoading}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Google
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

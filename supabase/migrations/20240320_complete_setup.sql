@@ -168,36 +168,47 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Function to ensure new user has a team
-CREATE OR REPLACE FUNCTION ensure_user_has_team()
-RETURNS TRIGGER
+CREATE OR REPLACE FUNCTION ensure_user_has_team(input_user_id UUID)
+RETURNS void
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, auth
 LANGUAGE plpgsql
 AS $$
 DECLARE
     _team_id UUID;
     _board_id UUID;
     _position FLOAT;
+    _ticket_id TEXT;
 BEGIN
-    -- Only proceed if this is a new user
-    IF TG_OP = 'INSERT' THEN
+    -- Create their first team if they don't have one
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM teams t
+        WHERE t.created_by = input_user_id 
+        OR EXISTS (
+            SELECT 1 FROM team_members tm 
+            WHERE tm.team_id = t.id 
+            AND tm.user_id = input_user_id
+        )
+    ) THEN
         -- Create their first team
         INSERT INTO teams (name, created_by)
-        VALUES ('My Team', NEW.id)
+        VALUES ('My Team', input_user_id)
         RETURNING id INTO _team_id;
 
         -- Make them an owner of the team
         INSERT INTO team_members (team_id, user_id, role)
-        VALUES (_team_id, NEW.id, 'owner');
+        VALUES (_team_id, input_user_id, 'owner');
 
         -- Create default board
         INSERT INTO boards (name, description, team_id, created_by)
-        VALUES ('Project Board', 'Welcome to your first Kanban board!', _team_id, NEW.id)
+        VALUES ('Project Board', 'Welcome to your first Kanban board!', _team_id, input_user_id)
         RETURNING id INTO _board_id;
 
         -- Create example tasks with different positions
         -- Backlog
         _position := 65536;
+        _ticket_id := 'T-' || substr(md5(random()::text), 1, 8);
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
@@ -211,14 +222,16 @@ BEGIN
             E'  <li>Click the "New Task" button to create your own tasks</li>\n' ||
             E'  <li>Use the rich text editor to format task descriptions</li>\n' ||
             E'  <li>Try the chat panel to collaborate with your team</li>\n' ||
-            E'</ul>',
+            E'</ul>\n' ||
+            E'<p>Try editing this task to explore these features!</p>',
             'todo', 'high', _position,
-            'TASK-001', _board_id, _team_id, NEW.id,
+            _ticket_id, _board_id, _team_id, input_user_id,
             ARRAY['getting-started', 'documentation']
         );
 
         -- Todo
         _position := _position + 65536;
+        _ticket_id := 'T-' || substr(md5(random()::text), 1, 8);
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
@@ -235,12 +248,13 @@ BEGIN
             E'</ul>\n' ||
             E'<p>Try editing this task to explore these features!</p>',
             'in_progress', 'medium', _position,
-            'TASK-002', _board_id, _team_id, NEW.id,
+            _ticket_id, _board_id, _team_id, input_user_id,
             ARRAY['features', 'tutorial']
         );
 
         -- In Progress
         _position := _position + 65536;
+        _ticket_id := 'T-' || substr(md5(random()::text), 1, 8);
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
@@ -257,12 +271,13 @@ BEGIN
             E'</ul>\n' ||
             E'<p>Try using the chat panel on the right to communicate with your team!</p>',
             'backlog', 'low', _position,
-            'TASK-003', _board_id, _team_id, NEW.id,
+            _ticket_id, _board_id, _team_id, input_user_id,
             ARRAY['chat', 'collaboration']
         );
 
         -- In Review
         _position := _position + 65536;
+        _ticket_id := 'T-' || substr(md5(random()::text), 1, 8);
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
@@ -277,12 +292,13 @@ BEGIN
             E'</ul>\n' ||
             E'<p>Click the icons in the top navigation to explore these features!</p>',
             'todo', 'medium', _position,
-            'TASK-004', _board_id, _team_id, NEW.id,
+            _ticket_id, _board_id, _team_id, input_user_id,
             ARRAY['tools', 'advanced']
         );
 
         -- Done
         _position := _position + 65536;
+        _ticket_id := 'T-' || substr(md5(random()::text), 1, 8);
         INSERT INTO tasks (
             title, description, status, priority, position,
             ticket_id, board_id, team_id, created_by,
@@ -300,7 +316,7 @@ BEGIN
             E'</ol>\n' ||
             E'<p>Give it a try now!</p>',
             'done', 'low', _position,
-            'TASK-005', _board_id, _team_id, NEW.id,
+            _ticket_id, _board_id, _team_id, input_user_id,
             ARRAY['example', 'tutorial']
         );
 
@@ -313,61 +329,42 @@ BEGIN
         ) VALUES (
             '👋 Welcome to the team chat! This is where you can collaborate with your team members.',
             _team_id,
-            NEW.id,
+            input_user_id,
             true
         );
 
-        INSERT INTO messages (
-            content,
-            team_id,
-            user_id,
-            is_pinned
-        ) VALUES (
-            '💡 Tip: You can pin important messages, like announcements or guidelines, by clicking the pin icon.',
-            _team_id,
-            NEW.id,
-            true
-        );
-
-        INSERT INTO messages (
-            content,
-            team_id,
-            user_id,
-            is_pinned
-        ) VALUES (
-            '🔍 Try mentioning team members using @username or linking to tasks using their ticket IDs (e.g., TASK-001)',
-            _team_id,
-            NEW.id,
-            false
-        );
-
-        INSERT INTO messages (
-            content,
-            team_id,
-            user_id,
-            is_pinned
-        ) VALUES (
-            '🎉 Welcome to the team chat! This is where you can collaborate with your team members.',
-            _team_id,
-            NEW.id,
-            false
-        );
+        RAISE NOTICE 'Successfully created team % for user %', _team_id, input_user_id;
     END IF;
-
-    RETURN NEW;
-EXCEPTION
-    WHEN OTHERS THEN
-        RAISE WARNING 'Error in ensure_user_has_team: %', SQLERRM;
-        RETURN NEW;
 END;
 $$;
 
 -- Create trigger for new user creation
 DROP TRIGGER IF EXISTS ensure_user_has_team_trigger ON auth.users;
+
+CREATE OR REPLACE FUNCTION trigger_ensure_user_has_team()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Log the trigger execution
+    RAISE NOTICE 'Executing trigger for user: %', NEW.id;
+    
+    BEGIN
+        -- Try to ensure user has a team
+        PERFORM ensure_user_has_team(NEW.id);
+        RAISE NOTICE 'Successfully created team for user: %', NEW.id;
+    EXCEPTION WHEN OTHERS THEN
+        -- Log the error but don't prevent user creation
+        RAISE WARNING 'Error in trigger_ensure_user_has_team for user %: % %', NEW.id, SQLERRM, SQLSTATE;
+    END;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
+
+-- Create the trigger
 CREATE TRIGGER ensure_user_has_team_trigger
     AFTER INSERT ON auth.users
     FOR EACH ROW
-    EXECUTE FUNCTION ensure_user_has_team();
+    EXECUTE FUNCTION trigger_ensure_user_has_team();
 
 -- Enable RLS
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
@@ -385,44 +382,57 @@ DROP POLICY IF EXISTS "Board access" ON boards;
 DROP POLICY IF EXISTS "Task access" ON tasks;
 DROP POLICY IF EXISTS "Message access" ON messages;
 
--- Team access - you can see teams you created or are a member of
+-- Team access policies
 CREATE POLICY "Team access" ON teams FOR ALL USING (
     created_by = auth.uid()
 );
 
--- Team members access - you can see members of teams you created or are a member of
-CREATE POLICY "Team members access" ON team_members FOR ALL USING (
-    user_id = auth.uid()
-);
+-- Team members access policies - split by operation
+CREATE POLICY "Team members select" ON team_members 
+    FOR SELECT USING (
+        user_id = auth.uid()
+    );
 
--- Board access - you can see boards of teams you created or are a member of
+CREATE POLICY "Team members insert" ON team_members 
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM teams t
+            WHERE t.id = team_id
+            AND t.created_by = auth.uid()
+        )
+    );
+
+CREATE POLICY "Team members update" ON team_members 
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM teams t
+            WHERE t.id = team_id
+            AND t.created_by = auth.uid()
+        )
+    );
+
+CREATE POLICY "Team members delete" ON team_members 
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM teams t
+            WHERE t.id = team_id
+            AND t.created_by = auth.uid()
+        )
+    );
+
+-- Board access policy
 CREATE POLICY "Board access" ON boards FOR ALL USING (
-    created_by = auth.uid() OR
-    EXISTS (
-        SELECT 1 FROM team_members 
-        WHERE team_members.team_id = boards.team_id 
-        AND team_members.user_id = auth.uid()
-    )
+    created_by = auth.uid()
 );
 
--- Task access - you can see tasks of teams you created or are a member of
+-- Task access policy
 CREATE POLICY "Task access" ON tasks FOR ALL USING (
-    created_by = auth.uid() OR
-    EXISTS (
-        SELECT 1 FROM team_members 
-        WHERE team_members.team_id = tasks.team_id 
-        AND team_members.user_id = auth.uid()
-    )
+    created_by = auth.uid()
 );
 
--- Message access - you can see messages of teams you created or are a member of
+-- Message access policy
 CREATE POLICY "Message access" ON messages FOR ALL USING (
-    user_id = auth.uid() OR
-    EXISTS (
-        SELECT 1 FROM team_members 
-        WHERE team_members.team_id = messages.team_id 
-        AND team_members.user_id = auth.uid()
-    )
+    user_id = auth.uid()
 );
 
 -- Grant necessary permissions
@@ -435,6 +445,24 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
 GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO anon;
 
 -- Ensure the functions have necessary permissions
-GRANT EXECUTE ON FUNCTION ensure_user_has_team() TO postgres;
-GRANT EXECUTE ON FUNCTION update_updated_at_column() TO postgres;
-GRANT EXECUTE ON FUNCTION update_task_positions(task_position_update[]) TO authenticated; 
+GRANT EXECUTE ON FUNCTION ensure_user_has_team(UUID) TO postgres, authenticated, anon;
+GRANT EXECUTE ON FUNCTION trigger_ensure_user_has_team() TO postgres, authenticated, anon;
+GRANT EXECUTE ON FUNCTION update_updated_at_column() TO postgres, authenticated, anon;
+GRANT EXECUTE ON FUNCTION update_task_positions(task_position_update[]) TO authenticated;
+
+-- Ensure auth trigger has access to auth schema
+GRANT USAGE ON SCHEMA auth TO postgres, authenticated, anon;
+GRANT SELECT ON auth.users TO postgres, authenticated, anon;
+
+-- Update function security
+ALTER FUNCTION ensure_user_has_team(UUID)
+SET search_path = public, auth;
+
+ALTER FUNCTION trigger_ensure_user_has_team()
+SET search_path = public, auth;
+
+-- Make sure functions are owned by postgres
+ALTER FUNCTION ensure_user_has_team(UUID) OWNER TO postgres;
+ALTER FUNCTION trigger_ensure_user_has_team() OWNER TO postgres;
+ALTER FUNCTION update_updated_at_column() OWNER TO postgres;
+ALTER FUNCTION update_task_positions(task_position_update[]) OWNER TO postgres; 

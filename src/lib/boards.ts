@@ -16,6 +16,18 @@ function transformTask(task: any): Task {
   };
 }
 
+// Helper function to generate ticket IDs
+async function generateTicketId(teamId: string) {
+  const { count } = await supabase
+    .from('tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('team_id', teamId);
+
+  const nextNumber = (count ?? 0) + 1;
+  const timestamp = Date.now().toString(36);
+  return `${teamId.slice(0, 4)}-${timestamp}-${nextNumber.toString().padStart(4, '0')}`;
+}
+
 // Task operations
 export async function createTask(data: {
   title: string;
@@ -32,7 +44,7 @@ export async function createTask(data: {
   dueDate?: string;
 }) {
   // Generate ticket ID
-  const ticketId = await generateTicketId();
+  const ticketId = await generateTicketId(data.teamId);
 
   const { data: task, error } = await supabase
     .from('tasks')
@@ -101,16 +113,6 @@ export async function getTasks(boardId?: string) {
 
   if (error) throw error;
   return (data || []).map(transformTask);
-}
-
-// Helper function to generate ticket IDs
-async function generateTicketId() {
-  const { count } = await supabase
-    .from('tasks')
-    .select('*', { count: 'exact', head: true });
-
-  const nextNumber = (count ?? 0) + 1;
-  return `TASK-${nextNumber.toString().padStart(4, '0')}`;
 }
 
 // Board operations
