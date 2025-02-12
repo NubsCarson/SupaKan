@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { Bot, Send, Key, Loader2, Settings2, Sparkles, Github, Twitter, RefreshCcw, Trash2, Info, Copy } from 'lucide-react';
+import { Bot, Send, Key, Loader2, Settings2, Sparkles, Github, Twitter, RefreshCcw, Trash2, Info, Copy, Wand2, Brain, Zap, MessageSquare } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Database } from '@/lib/database.types';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -201,31 +202,53 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
   };
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-6xl">
-      {/* Hero Section */}
-      <div className="relative mb-8 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-background p-8">
+    <div className="container mx-auto py-8 px-4 max-w-7xl">
+      {/* Enhanced Hero Section */}
+      <div className="relative mb-8 rounded-xl overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-background animate-gradient-x" />
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] dark:bg-grid-black/10" />
-        <div className="relative">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative p-8 backdrop-blur-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
-              <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
-                <Sparkles className="h-8 w-8 text-primary" />
-                SupaKan AI Assistant
+              <h1 className="flex items-center gap-3 text-4xl font-bold tracking-tight sm:text-5xl">
+                <div className="relative">
+                  <Sparkles className="h-10 w-10 text-primary animate-pulse" />
+                  <div className="absolute inset-0 blur-sm animate-pulse">
+                    <Sparkles className="h-10 w-10 text-primary" />
+                  </div>
+                </div>
+                SupaKan AI
               </h1>
-              <p className="text-muted-foreground max-w-[600px]">
-                Your intelligent companion for task and team management, powered by OpenAI
+              <p className="text-muted-foreground text-lg max-w-[600px] leading-relaxed">
+                Your intelligent companion for task and team management, powered by advanced AI
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={handleRefreshData} title="Refresh Data">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleRefreshData} 
+                title="Refresh Data"
+                className="hover:bg-primary/10 transition-colors"
+              >
                 <RefreshCcw className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" onClick={handleClearChat} title="Clear Chat">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handleClearChat} 
+                title="Clear Chat"
+                className="hover:bg-primary/10 transition-colors"
+              >
                 <Trash2 className="h-4 w-4" />
               </Button>
               <Dialog open={showSettings} onOpenChange={setShowSettings}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    className="hover:bg-primary/10 transition-colors"
+                  >
                     <Settings2 className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
@@ -271,30 +294,54 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
             </div>
           </div>
 
-          {/* Quick Stats */}
-          <div className="mt-6 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-            <Badge variant="outline" className="bg-primary/10 inline-flex items-center">
-              <span className="truncate">{tasks.length} Total Tasks</span>
-            </Badge>
-            <Badge variant="outline" className="bg-green-500/10 text-green-500 inline-flex items-center">
-              <span className="truncate">{tasks.filter(t => t.status === 'done').length} Completed</span>
-            </Badge>
-            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 inline-flex items-center">
-              <span className="truncate">{tasks.filter(t => t.status !== 'done').length} In Progress</span>
-            </Badge>
-            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 inline-flex items-center">
-              <span className="truncate">{teams.length} Active Teams</span>
-            </Badge>
+          {/* Enhanced Stats Section */}
+          <div className="mt-8 grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:items-center">
+            <div className="flex items-center gap-3 rounded-lg bg-primary/10 px-4 py-2 transition-colors hover:bg-primary/20">
+              <div className="rounded-full bg-primary/20 p-2">
+                <MessageSquare className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <div className="text-sm font-medium">{tasks.length}</div>
+                <div className="text-xs text-muted-foreground">Total Tasks</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-green-500/10 px-4 py-2 transition-colors hover:bg-green-500/20">
+              <div className="rounded-full bg-green-500/20 p-2">
+                <Zap className="h-4 w-4 text-green-500" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-green-500">{tasks.filter(t => t.status === 'done').length}</div>
+                <div className="text-xs text-muted-foreground">Completed</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-yellow-500/10 px-4 py-2 transition-colors hover:bg-yellow-500/20">
+              <div className="rounded-full bg-yellow-500/20 p-2">
+                <Brain className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-yellow-500">{tasks.filter(t => t.status !== 'done').length}</div>
+                <div className="text-xs text-muted-foreground">In Progress</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-blue-500/10 px-4 py-2 transition-colors hover:bg-blue-500/20">
+              <div className="rounded-full bg-blue-500/20 p-2">
+                <Wand2 className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <div className="text-sm font-medium text-blue-500">{teams.length}</div>
+                <div className="text-xs text-muted-foreground">Active Teams</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr,300px]">
-        {/* Main Chat Area */}
-        <Card className="flex flex-col h-[600px]">
-          <CardHeader className="border-b">
+      <div className="grid gap-8 lg:grid-cols-[1fr,320px]">
+        {/* Enhanced Chat Area */}
+        <Card className="flex flex-col h-[700px] border-2 transition-shadow hover:shadow-lg">
+          <CardHeader className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <CardTitle className="flex items-center gap-2">
-              <Bot className="h-5 w-5" />
+              <Bot className="h-5 w-5 text-primary" />
               Chat with SupaKan AI
             </CardTitle>
             <CardDescription>
@@ -302,37 +349,39 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-0">
-            <ScrollArea className="h-[calc(600px-10rem)] p-4">
+            <ScrollArea className="h-[calc(700px-12rem)] p-6">
               <AnimatePresence>
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {messages.map((message, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
-                      className={`flex ${
-                        message.role === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
+                      className={cn(
+                        "flex",
+                        message.role === 'user' ? "justify-end" : "justify-start"
+                      )}
                     >
-                      <div className="flex flex-col gap-1 max-w-[80%]">
+                      <div className="flex flex-col gap-2 max-w-[80%]">
                         <div
-                          className={`rounded-lg px-4 py-2 group relative ${
+                          className={cn(
+                            "rounded-lg px-4 py-2 group relative",
                             message.role === 'user'
-                              ? 'bg-primary text-primary-foreground ml-auto'
-                              : 'bg-muted'
-                          }`}
+                              ? "bg-primary text-primary-foreground ml-auto"
+                              : "bg-muted/50 backdrop-blur-sm"
+                          )}
                         >
                           {message.content}
                           <button
                             onClick={() => handleCopyMessage(message.content)}
-                            className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
                           >
                             <Copy className="h-4 w-4" />
                           </button>
                         </div>
                         {message.timestamp && (
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground px-2">
                             {format(message.timestamp, 'HH:mm')}
                           </span>
                         )}
@@ -345,8 +394,8 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                       animate={{ opacity: 1, y: 0 }}
                       className="flex justify-start"
                     >
-                      <div className="flex items-center gap-2 rounded-lg px-4 py-2 bg-muted">
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                      <div className="flex items-center gap-2 rounded-lg px-4 py-2 bg-muted/50 backdrop-blur-sm">
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         <span className="text-sm">SupaKan is thinking...</span>
                       </div>
                     </motion.div>
@@ -355,28 +404,35 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
               </AnimatePresence>
             </ScrollArea>
           </CardContent>
-          <CardFooter className="border-t p-4">
+          <CardFooter className="border-t p-4 bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
             <form onSubmit={handleSendMessage} className="flex w-full gap-2">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={apiKey ? "Ask anything about your tasks and teams..." : "Please set your OpenAI API key first"}
                 disabled={!apiKey || loading}
-                className="flex-1"
+                className="flex-1 bg-background/50 backdrop-blur-sm"
               />
-              <Button type="submit" disabled={!apiKey || !input.trim() || loading}>
+              <Button 
+                type="submit" 
+                disabled={!apiKey || !input.trim() || loading}
+                className="bg-primary hover:bg-primary/90 transition-colors"
+              >
                 <Send className="h-4 w-4" />
               </Button>
             </form>
           </CardFooter>
         </Card>
 
-        {/* Sidebar */}
-        <div className="space-y-4">
-          {/* Example Prompts */}
-          <Card>
+        {/* Enhanced Sidebar */}
+        <div className="space-y-6">
+          {/* Example Prompts Card */}
+          <Card className="border-2 transition-shadow hover:shadow-md">
             <CardHeader>
-              <CardTitle className="text-sm">Example Prompts</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Example Prompts
+              </CardTitle>
               <CardDescription>
                 Click to try these questions
               </CardDescription>
@@ -387,10 +443,10 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                   <Button
                     key={index}
                     variant="ghost"
-                    className="justify-start h-8 py-1 px-2 w-full hover:bg-muted/50"
+                    className="justify-start h-9 w-full hover:bg-primary/10 transition-colors"
                     onClick={() => setInput(prompt)}
                   >
-                    <Sparkles className="h-3 w-3 shrink-0 mr-1.5 text-primary" />
+                    <Sparkles className="h-3 w-3 shrink-0 mr-2 text-primary" />
                     <span className="text-sm text-left line-clamp-1">{prompt}</span>
                   </Button>
                 ))}
@@ -398,33 +454,36 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
             </CardContent>
           </Card>
 
-          {/* About */}
-          <Card>
+          {/* About Card */}
+          <Card className="border-2 transition-shadow hover:shadow-md">
             <CardHeader>
-              <CardTitle className="text-sm">About SupaKan AI</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Info className="h-4 w-4 text-primary" />
+                About SupaKan AI
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                 Powered by OpenAI's GPT-3.5, integrated with SupaKan by Nubs Carson
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" asChild className="flex-1 hover:bg-primary/10 transition-colors">
                   <a 
                     href="https://github.com/NubsCarson/SupaKan" 
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 justify-center"
                   >
                     <Github className="h-4 w-4" />
                     GitHub
                   </a>
                 </Button>
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline" size="sm" asChild className="flex-1 hover:bg-primary/10 transition-colors">
                   <a 
                     href="https://twitter.com/monerosolana" 
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 justify-center"
                   >
                     <Twitter className="h-4 w-4" />
                     Twitter

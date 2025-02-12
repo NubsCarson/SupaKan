@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users, Keyboard } from 'lucide-react';
+import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users, Keyboard, Eye, Grid3X3, ListFilter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -19,6 +19,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,6 +279,15 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
   );
 }
 
+// Update ViewPreferences interface
+interface ViewPreferences {
+  view: 'grid' | 'list';
+  gridColumns: 2 | 3 | 4;
+  showTaskCount: boolean;
+  dateFormat: 'relative' | 'absolute';
+  sortPreference: 'recent' | 'name' | 'tasks';
+}
+
 export default function BoardsPage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -289,11 +300,20 @@ export default function BoardsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'tasks'>('recent');
   const [filterTimeframe, setFilterTimeframe] = useState<'all' | 'today' | 'week' | 'month'>('all');
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [viewPrefs, setViewPrefs] = useState<ViewPreferences>(() => {
+    const saved = localStorage.getItem('boardViewPrefs');
+    return saved ? JSON.parse(saved) : {
+      view: 'grid',
+      gridColumns: 3,
+      showTaskCount: true,
+      dateFormat: 'relative',
+      sortPreference: 'recent'
+    };
+  });
 
   // Create shortcuts
   const shortcuts = createShortcuts({
@@ -326,6 +346,16 @@ export default function BoardsPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [shortcuts]);
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem('boardViewPrefs', JSON.stringify(viewPrefs));
+  }, [viewPrefs]);
+
+  // Use preferences for sorting
+  useEffect(() => {
+    setSortBy(viewPrefs.sortPreference);
+  }, [viewPrefs.sortPreference]);
 
   useEffect(() => {
     loadBoards();
@@ -515,8 +545,8 @@ export default function BoardsPage() {
             <div className="flex items-center gap-2">
               <Button onClick={() => setIsCreateDialogOpen(true)} size="lg" className="gap-2">
                 <Plus className="h-5 w-5" />
-                New Board
-              </Button>
+          New Board
+        </Button>
             </div>
           </div>
 
@@ -660,30 +690,99 @@ export default function BoardsPage() {
             </Tabs>
           </div>
           <div className="flex items-center gap-2">
+            {/* Grid/List View Toggle */}
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setView(view === 'grid' ? 'list' : 'grid')}
+              onClick={() => setViewPrefs(prev => ({
+                ...prev,
+                view: prev.view === 'grid' ? 'list' : 'grid'
+              }))}
               className="h-9 w-9 relative group"
             >
               <Layout className="h-4 w-4 transition-transform group-hover:scale-110" />
               <span className="sr-only">Toggle view</span>
               <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover px-2 py-1 text-xs rounded shadow opacity-0 transition-opacity group-hover:opacity-100">
-                {view === 'grid' ? 'Switch to list' : 'Switch to grid'}
+                {viewPrefs.view === 'grid' ? 'List view' : 'Grid view'}
               </span>
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setSortBy(sortBy === 'recent' ? 'name' : 'recent')}
-              className="h-9 w-9 relative group"
-            >
-              <SortAsc className="h-4 w-4 transition-transform group-hover:scale-110" />
-              <span className="sr-only">Sort boards</span>
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover px-2 py-1 text-xs rounded shadow opacity-0 transition-opacity group-hover:opacity-100">
-                Sort by {sortBy === 'recent' ? 'name' : 'date'}
-              </span>
-            </Button>
+
+            {/* Grid Columns Toggle (only show when in grid view) */}
+            {viewPrefs.view === 'grid' && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  gridColumns: prev.gridColumns === 4 ? 2 : (prev.gridColumns + 1) as 2 | 3 | 4
+                }))}
+                className="h-9 w-9 relative group"
+              >
+                <Grid3X3 className="h-4 w-4 transition-transform group-hover:scale-110" />
+                <span className="sr-only">Toggle grid columns</span>
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover px-2 py-1 text-xs rounded shadow opacity-0 transition-opacity group-hover:opacity-100">
+                  {viewPrefs.gridColumns} columns
+                </span>
+              </Button>
+            )}
+
+            {/* View Options Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 relative group"
+                >
+                  <ListFilter className="h-4 w-4 transition-transform group-hover:scale-110" />
+                  <span className="sr-only">View options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[200px]">
+                <DropdownMenuLabel>View Options</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  showTaskCount: !prev.showTaskCount
+                }))}>
+                  <CheckCircle className={cn(
+                    "mr-2 h-4 w-4",
+                    viewPrefs.showTaskCount ? "opacity-100" : "opacity-0"
+                  )} />
+                  Show task count
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  dateFormat: prev.dateFormat === 'relative' ? 'absolute' : 'relative'
+                }))}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {viewPrefs.dateFormat === 'relative' ? 'Absolute dates' : 'Relative dates'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  sortPreference: 'recent'
+                }))}>
+                  <Clock className="mr-2 h-4 w-4" />
+                  Most Recent
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  sortPreference: 'name'
+                }))}>
+                  <SortAsc className="mr-2 h-4 w-4" />
+                  Board Name
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setViewPrefs(prev => ({
+                  ...prev,
+                  sortPreference: 'tasks'
+                }))}>
+                  <Layout className="mr-2 h-4 w-4" />
+                  Task Count
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </motion.div>
       </div>
@@ -691,7 +790,12 @@ export default function BoardsPage() {
       {/* Boards Grid with Enhanced Animation */}
       <div className={cn(
         "grid gap-4",
-        view === 'grid' ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+        viewPrefs.view === 'grid' && {
+          'sm:grid-cols-2 lg:grid-cols-2': viewPrefs.gridColumns === 2,
+          'sm:grid-cols-2 lg:grid-cols-3': viewPrefs.gridColumns === 3,
+          'sm:grid-cols-2 lg:grid-cols-4': viewPrefs.gridColumns === 4
+        },
+        viewPrefs.view === 'list' && "grid-cols-1"
       )}>
         {filteredBoards.map((board, index) => (
           <motion.div
@@ -702,91 +806,99 @@ export default function BoardsPage() {
           >
             <Card className={cn(
               "group relative overflow-hidden transition-all duration-200 hover:shadow-lg",
-              view === 'list' && "flex"
+              viewPrefs.view === 'list' && "flex"
             )}>
               <div className={cn(
                 "absolute inset-0 bg-gradient-to-b from-transparent to-black/5 opacity-0 transition-opacity group-hover:opacity-100",
-                view === 'list' && "hidden"
+                viewPrefs.view === 'list' && "hidden"
               )} />
               <CardHeader className={cn(
-                view === 'list' && "flex-1"
+                viewPrefs.view === 'list' && "flex-1"
               )}>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 group-hover:text-primary">
                     {board.name}
                     <ArrowUpRight className="h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
                   </CardTitle>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="opacity-0 group-hover:opacity-100 relative z-20"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 relative z-20"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[160px]">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingBoard(board);
-                          setIsEditDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingBoard(board);
-                          setIsDeleteDialogOpen(true);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <CardDescription>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingBoard(board);
+                        setIsEditDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingBoard(board);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <CardDescription>
                   <span>{board.description || 'No description'}</span>
-                </CardDescription>
-              </CardHeader>
+              </CardDescription>
+            </CardHeader>
               <CardContent className={cn(
-                view === 'list' && "hidden"
+                viewPrefs.view === 'list' && "hidden"
               )}>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  {isToday(new Date(board.created_at))
-                    ? 'Created today'
-                    : isYesterday(new Date(board.created_at))
-                    ? 'Created yesterday'
-                    : `Created ${format(new Date(board.created_at), 'MMM d, yyyy')}`}
-                </div>
-              </CardContent>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                  {viewPrefs.dateFormat === 'relative' ? (
+                    isToday(new Date(board.created_at))
+                      ? 'Created today'
+                      : isYesterday(new Date(board.created_at))
+                      ? 'Created yesterday'
+                      : `Created ${format(new Date(board.created_at), 'MMM d, yyyy')}`
+                  ) : (
+                    format(new Date(board.created_at), 'PPP')
+                  )}
+              </div>
+            </CardContent>
               <CardFooter className={cn(
                 "flex justify-between text-sm text-muted-foreground",
-                view === 'list' && "ml-auto"
+                viewPrefs.view === 'list' && "ml-auto"
               )}>
-                <div className={cn(view === 'list' && "hidden")}>
+                <div className={cn(
+                  viewPrefs.view === 'list' && "hidden"
+                )}>
                   Team: {board.team_name}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Star className="h-4 w-4" />
-                  <span>{board.task_count} tasks</span>
-                </div>
-              </CardFooter>
+                {viewPrefs.showTaskCount && (
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4" />
+                    <span>{board.task_count} tasks</span>
+                  </div>
+                )}
+            </CardFooter>
               <motion.div
-                className="absolute inset-0 cursor-pointer rounded-lg transition-colors hover:bg-muted/50"
-                onClick={() => navigate(`/board/${board.id}`)}
-                style={{ zIndex: 10 }}
+              className="absolute inset-0 cursor-pointer rounded-lg transition-colors hover:bg-muted/50"
+              onClick={() => navigate(`/board/${board.id}`)}
+              style={{ zIndex: 10 }}
                 whileHover={{ scale: 1.02 }}
                 transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              />
-            </Card>
+            />
+          </Card>
           </motion.div>
         ))}
 
@@ -807,7 +919,7 @@ export default function BoardsPage() {
                   ? "Try adjusting your search query"
                   : "Create your first board to get started!"}
               </p>
-            </div>
+          </div>
             <Button 
               onClick={() => setIsCreateDialogOpen(true)} 
               variant="outline"

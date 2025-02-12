@@ -264,6 +264,11 @@ export function Board() {
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(task => task.status === 'done').length;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const overdueTasks = tasks.filter(task => 
+    task.due_date && 
+    new Date(task.due_date) < new Date() && 
+    task.status !== 'done'
+  ).length;
 
   const todoTasks = tasks.filter(task => task.status === 'todo');
   const inProgressTasks = tasks.filter(task => task.status === 'in_progress');
@@ -272,26 +277,62 @@ export function Board() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-7.5rem)]">
-      <div className="flex flex-col gap-4 px-4 py-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
-            {board?.name || 'Loading...'}
-          </h1>
-          <div className="text-sm text-muted-foreground">
-            {completedTasks} of {totalTasks} tasks completed ({completionRate}%)
+      {/* Enhanced Header Section */}
+      <div className="relative px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-background/5 to-background/5 opacity-50" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
+                {board?.name || 'Loading...'}
+              </h1>
+              <Badge variant="secondary" className="bg-secondary/30 text-secondary-foreground">
+                {tasks.length} Tasks
+              </Badge>
+              {overdueTasks > 0 && (
+                <Badge variant="destructive" className="bg-destructive/90">
+                  {overdueTasks} Overdue
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-green-500/70" />
+                <span>{completedTasks} Completed</span>
+              </div>
+              <span className="text-muted-foreground/40">•</span>
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-yellow-500/70" />
+                <span>{tasks.length - completedTasks} Remaining</span>
+              </div>
+              <span className="text-muted-foreground/40">•</span>
+              <div className="flex items-center gap-1.5">
+                <div className="h-2 w-2 rounded-full bg-primary/70" />
+                <span>{completionRate}% Progress</span>
+              </div>
+              {overdueTasks > 0 && (
+                <>
+                  <span className="text-muted-foreground/40">•</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-destructive/70" />
+                    <span className="text-destructive-foreground/90">{overdueTasks} Past Due</span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            onClick={() => {
-              setSelectedTask(null);
-              setIsTaskDialogOpen(true);
-            }}
-            className="w-full sm:w-auto"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            New Task
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={() => {
+                setSelectedTask(null);
+                setIsTaskDialogOpen(true);
+              }}
+              className="gap-2 bg-primary/90 hover:bg-primary transition-colors shadow-sm"
+            >
+              <Plus className="h-4 w-4" />
+              New Task
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -307,23 +348,28 @@ export function Board() {
               return (
                 <div
                   key={id}
-                  className="flex h-full w-[280px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm dark:bg-card/80 sm:w-[300px] md:w-[350px]"
+                  className="flex h-full w-[280px] flex-shrink-0 flex-col rounded-lg border bg-card text-card-foreground shadow-sm transition-shadow hover:shadow-md dark:bg-card/80 sm:w-[300px] md:w-[350px]"
                 >
                   <div className="p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <span role="img" aria-label={title}>{icon}</span>
+                        <span role="img" aria-label={title} className="text-lg">{icon}</span>
                         <h2 className="font-semibold text-foreground">{title}</h2>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm text-muted-foreground">
-                          {columnTasks.length}
-                        </div>
-                      </div>
+                      <Badge variant="outline" className="bg-muted">
+                        {columnTasks.length}
+                      </Badge>
                     </div>
-                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
                       <div
-                        className="h-full bg-primary transition-all duration-500"
+                        className={cn(
+                          "h-full transition-all duration-500",
+                          id === 'backlog' && "bg-primary/70",
+                          id === 'todo' && "bg-blue-500/70",
+                          id === 'in_progress' && "bg-yellow-500/70",
+                          id === 'in_review' && "bg-orange-500/70",
+                          id === 'done' && "bg-green-500/70"
+                        )}
                         style={{ width: `${columnCompletion}%` }}
                       />
                     </div>
