@@ -19,6 +19,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format, subDays } from 'date-fns';
 import { toast } from '@/components/ui/use-toast';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Task = Database['public']['Tables']['tasks']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -335,94 +337,160 @@ export function SystemDashboard() {
                   value={dbStats?.completionRate || 0} 
                   className="mt-2"
                 />
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {dbStats?.completionRate.toFixed(1)}% completion rate
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20">
+                    {metrics?.completed || 0} completed
+                  </Badge>
+                  <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20">
+                    {metrics?.pending || 0} remaining
+                  </Badge>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Task Status */}
+            {/* Board Stats */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Task Status</CardTitle>
+                <CardTitle className="text-sm font-medium">Board Stats</CardTitle>
+                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter(t => t.status !== 'done').length > 0 ? 
+                        tasks.filter(t => t.status !== 'done').length : 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Active Boards
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter(t => t.status === 'done').length > 0 ?
+                        tasks.filter(t => t.status === 'done').length : 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Empty Boards
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Task Distribution */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Task Distribution</CardTitle>
+                <PieChart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter(t => t.priority === 'high').length}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      High Priority
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {tasks.filter(t => t.assigned_to).length}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Assigned Tasks
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Activity Stats */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">Activity</CardTitle>
                 <Activity className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-xl font-bold text-green-500">{metrics?.completed || 0}</div>
-                    <div className="text-xs text-muted-foreground">Done</div>
-                  </div>
-                  <div>
-                    <div className="text-xl font-bold text-yellow-500">{metrics?.inProgress || 0}</div>
-                    <div className="text-xs text-muted-foreground">Active</div>
-                  </div>
-                  <div>
-                    <div className="text-xl font-bold text-gray-500">{metrics?.pending || 0}</div>
-                    <div className="text-xs text-muted-foreground">Todo</div>
-                  </div>
+                <div className="text-2xl font-bold">
+                  {dbStats?.completionRate.toFixed(1)}%
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Messages */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Messages</CardTitle>
-                <MessageSquare className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{metrics?.messageCount || 0}</div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Total messages in system
+                <p className="text-xs text-muted-foreground mt-1">
+                  Overall Completion Rate
                 </p>
-              </CardContent>
-            </Card>
-
-            {/* Last Activity */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">Last Activity</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-medium">
-                  {metrics?.lastActivity 
-                    ? format(new Date(metrics.lastActivity), 'MMM dd, HH:mm')
-                    : 'No activity'}
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Last task update
-                </p>
+                <Progress 
+                  value={dbStats?.completionRate || 0} 
+                  className="mt-2"
+                />
               </CardContent>
             </Card>
           </div>
 
-          {/* System Health */}
+          {/* Detailed Stats Card */}
           <Card>
             <CardHeader>
-              <CardTitle>System Health</CardTitle>
-              <CardDescription>Database and system performance metrics</CardDescription>
+              <CardTitle>Detailed Statistics</CardTitle>
+              <CardDescription>Comprehensive view of system metrics</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Average Task Age</span>
-                  <span className="text-sm font-medium">
-                    {dbStats?.avgTaskAge.toFixed(1)} days
-                  </span>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Task Status</h4>
+                  <div className="grid gap-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Backlog</span>
+                      <span>{tasks.filter(t => t.status === 'backlog').length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">In Progress</span>
+                      <span>{tasks.filter(t => t.status === 'in_progress').length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">In Review</span>
+                      <span>{tasks.filter(t => t.status === 'in_review').length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Completed</span>
+                      <span>{tasks.filter(t => t.status === 'done').length}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Database Size</span>
-                  <span className="text-sm font-medium">
-                    {(dbStats?.taskCount || 0) + (dbStats?.messageCount || 0)} records
-                  </span>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Priority Distribution</h4>
+                  <div className="grid gap-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">High Priority</span>
+                      <span>{tasks.filter(t => t.priority === 'high').length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Medium Priority</span>
+                      <span>{tasks.filter(t => t.priority === 'medium').length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Low Priority</span>
+                      <span>{tasks.filter(t => t.priority === 'low').length}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Last Refresh</span>
-                  <span className="text-sm font-medium">
-                    {format(new Date(), 'HH:mm:ss')}
-                  </span>
+
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Task Assignment</h4>
+                  <div className="grid gap-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Assigned Tasks</span>
+                      <span>{tasks.filter(t => t.assigned_to).length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Unassigned Tasks</span>
+                      <span>{tasks.filter(t => !t.assigned_to).length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Due Tasks</span>
+                      <span>{tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -669,16 +737,20 @@ export function SystemDashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Auto-refresh Interval</label>
-                <select 
-                  className="w-full rounded-md border p-2"
-                  value={refreshInterval}
-                  onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                <Label className="text-sm font-medium">Auto-refresh Interval</Label>
+                <Select
+                  value={refreshInterval.toString()}
+                  onValueChange={(value) => setRefreshInterval(Number(value))}
                 >
-                  <option value={15000}>15 seconds</option>
-                  <option value={30000}>30 seconds</option>
-                  <option value={60000}>1 minute</option>
-                </select>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select refresh interval" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15000">15 seconds</SelectItem>
+                    <SelectItem value="30000">30 seconds</SelectItem>
+                    <SelectItem value="60000">1 minute</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
