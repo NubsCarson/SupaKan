@@ -76,7 +76,27 @@ Be professional, friendly, and helpful.`;
 
 const stripHtml = (html: string) => {
   if (!html) return '';
-  return html.replace(/<[^>]*>/g, '').trim();
+  
+  // First pass: remove script tags and their content
+  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  
+  // Second pass: remove style tags and their content
+  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+  
+  // Third pass: remove all remaining HTML tags
+  sanitized = sanitized.replace(/<[^>]+>/g, '');
+  
+  // Fourth pass: remove potentially dangerous HTML entities
+  sanitized = sanitized
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+  
+  // Finally, normalize whitespace
+  return sanitized.trim().replace(/\s+/g, ' ');
 };
 
 const formatDate = (date: string | null) => {
