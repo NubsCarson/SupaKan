@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
+import { Button, type ButtonProps } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Database } from '@/lib/database.types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -32,37 +34,77 @@ type Message = {
 
 type Task = Database['public']['Tables']['tasks']['Row'];
 type Team = Database['public']['Tables']['teams']['Row'];
+type Board = Database['public']['Tables']['boards']['Row'];
+type TeamMember = {
+  id: string;
+  team_id: string;
+  user_id: string;
+  role: string;
+  created_at: string;
+  updated_at: string;
+  user_email: string;
+};
 
 const EXAMPLE_PROMPTS = [
   "Task completion rate?",
   "Show me my high priority tasks",
-  "Summarize my team's workload",
+  "Summarize my team's tasks",
   "What tasks are overdue?",
-  "Give me a productivity analysis",
-  "What's my busiest project?",
+  "Who is on my team?",
+  "What teams do I belong to?",
 ];
 
-const SYSTEM_PROMPT = `You are SupaKan AI, an advanced AI assistant created by Nubs Carson (https://github.com/NubsCarson) for the SupaKan task management platform. You help users manage their tasks and teams efficiently.
+const SYSTEM_PROMPT = `You are SupaKan AI, an advanced, data-driven and friendly assistant for managing tasks, boards, and teams in the SupaKan platform. You have real-time access to data from the database and always strive to be both helpful and approachable.
 
-Your capabilities include:
-- Analyzing task and team data
-- Providing productivity insights
-- Suggesting workflow improvements
-- Answering questions about the SupaKan platform
+Instructions:
+1. Use ONLY the data provided in the context to answer queries accurately. Do not generate or assume any data that is not present.
+2. When a query pertains to a specific board, team, or task, filter the data by matching the provided identifiers.
+3. Provide precise, data-driven responses including counts and detailed lists when requested.
+4. For team-related queries, always use the userTeams and userTeamMembers data provided in the context.
+5. Never ask for the user's email if it's already provided in the context.
+6. If the information is not available or the query is ambiguous, explain what data is missing.
+7. Format responses cleanly:
+   - Don't show HTML tags in task descriptions
+   - Use bullet points (•) instead of numbers for lists
+   - Bold important information like task titles and dates
+   - Don't show raw HTML or markdown in responses
+   - Keep responses concise but informative
 
-Always be helpful, professional, and concise. When relevant, include specific data points and metrics in your responses.`;
+Remember: This assistant was created by nubs. The creator's Twitter is https://x.com/monerosolana and GitHub is github.com/nubscarson. Always use a friendly and warm tone in your responses.
+
+Be professional, friendly, and helpful.`;
+
+const stripHtml = (html: string) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').trim();
+};
+
+const formatDate = (date: string | null) => {
+  if (!date) return 'No due date';
+  return format(new Date(date), 'MMM d, yyyy');
+};
+
+const AI_MODELS = [
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Fast and cost-effective' },
+  { id: 'gpt-4', name: 'GPT-4', description: 'Most capable model' },
+  { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo', description: 'Latest GPT-4 with better performance' },
+] as const;
 
 export default function AIPage() {
   const { user } = useAuth();
   const [apiKey, setApiKey] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-3.5-turbo');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
+  const [userTeamMembers, setUserTeamMembers] = useState<TeamMember[]>([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -70,6 +112,8 @@ export default function AIPage() {
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem('openai_api_key');
+    const savedModel = localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
+    setSelectedModel(savedModel);
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
@@ -82,16 +126,37 @@ export default function AIPage() {
 
   const loadData = async () => {
     try {
-      const [tasksResponse, teamsResponse] = await Promise.all([
+      const [tasksResponse, teamsResponse, boardsResponse] = await Promise.all([
         supabase.from('tasks').select('*'),
-        supabase.from('teams').select('*')
+        supabase.from('teams').select('*'),
+        supabase.from('boards').select('*')
       ]);
 
       if (tasksResponse.error) throw tasksResponse.error;
       if (teamsResponse.error) throw teamsResponse.error;
+      if (boardsResponse.error) throw boardsResponse.error;
 
       setTasks(tasksResponse.data || []);
       setTeams(teamsResponse.data || []);
+      setBoards(boardsResponse.data || []);
+
+      if (user) {
+        const teamMembersByUserResponse = await supabase
+          .from('team_members')
+          .select('*')
+          .eq('user_id', user.id);
+        if (teamMembersByUserResponse.error) throw teamMembersByUserResponse.error;
+        const userTeamIds = teamMembersByUserResponse.data?.map((tm: { team_id: string }) => tm.team_id) || [];
+        const filteredUserTeams = (teamsResponse.data || []).filter((team: { id: string }) => userTeamIds.includes(team.id));
+        setUserTeams(filteredUserTeams);
+
+        const teamMembersWithUsersResponse = await supabase
+          .from('team_members_with_users')
+          .select('*')
+          .in('team_id', userTeamIds);
+        if (teamMembersWithUsersResponse.error) throw teamMembersWithUsersResponse.error;
+        setUserTeamMembers(teamMembersWithUsersResponse.data ?? []);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast({
@@ -124,7 +189,7 @@ export default function AIPage() {
     await loadData();
     toast({
       title: 'Data Refreshed',
-      description: 'Latest task and team data loaded',
+      description: 'Latest task, team, and board data loaded',
     });
   };
 
@@ -133,6 +198,15 @@ export default function AIPage() {
     toast({
       title: 'Copied',
       description: 'Message copied to clipboard',
+    });
+  };
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    localStorage.setItem('ai_model', model);
+    toast({
+      title: 'Model Updated',
+      description: `Switched to ${AI_MODELS.find(m => m.id === model)?.name}`,
     });
   };
 
@@ -150,23 +224,59 @@ export default function AIPage() {
     setLoading(true);
 
     try {
+      const boardMetrics = boards.map(board => `• ${board.name}: ${tasks.filter(t => t.board_id === board.id).length} tasks`).join('\n');
+
+      const lowerMessage = userMessage.toLowerCase();
+      const matchingBoard = boards.find(board => lowerMessage.includes(board.name.toLowerCase()));
+      let boardTaskDetails = '';
+      if (matchingBoard) {
+        const tasksForBoard = tasks.filter(task => task.board_id === matchingBoard.id);
+        if (tasksForBoard.length > 0) {
+          boardTaskDetails = '\n\nTask Details for board ' + matchingBoard.name + ':\n' + 
+            tasksForBoard.map(task => 
+              `• Title: ${task.title}\n  Description: ${stripHtml(task.description || 'No description')}\n  Due Date: ${formatDate(task.due_date)}\n  Status: ${task.status}\n  Priority: ${task.priority}`
+            ).join('\n\n');
+        }
+      }
+
+      // Build conversation history from last 3 messages
+      const conversationHistory = messages.length > 0 ? '\n\nConversation History:\n' + messages.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n') : '';
+
       const context = `
+Current User:
+• Email: ${user?.email || 'Not logged in'}
+• User ID: ${user?.id || 'Not logged in'}
+
 Current System Status:
-- Tasks: ${tasks.length} total (${tasks.filter(t => t.status === 'done').length} completed)
-- Teams: ${teams.length} active teams
-- Completion Rate: ${Math.round((tasks.filter(t => t.status === 'done').length / tasks.length) * 100)}%
-- High Priority Tasks: ${tasks.filter(t => t.priority === 'high').length}
-- Overdue Tasks: ${tasks.filter(t => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done').length}
+• Tasks: ${tasks.length} total (${tasks.filter(t => t.status === 'done').length} completed)
+• Teams: ${teams.length} active teams
+• Boards: ${boards.length} boards
+
+User's Teams (${userTeams.length}):
+${userTeams.length > 0 ? userTeams.map((team: { name: string }) => `• ${team.name}`).join('\n') : 'Not a member of any team.'}
+
+Team Members Details:
+${userTeams.map((team: { id: string, name: string }) => {
+  const members = userTeamMembers.filter((tm: TeamMember) => tm.team_id === team.id);
+  const memberList = members.map((tm: TeamMember) => `${tm.user_email} (${tm.role})`).join(', ');
+  return `• ${team.name}: ${memberList || 'No members found'}`;
+}).join('\n')}
 
 Task Distribution:
 ${Array.from(new Set(tasks.map(t => t.status))).map(status => 
-  `- ${status}: ${tasks.filter(t => t.status === status).length} tasks`
+  `• ${status}: ${tasks.filter(t => t.status === status).length} tasks`
 ).join('\n')}
 
 Priority Distribution:
 ${Array.from(new Set(tasks.map(t => t.priority))).map(priority => 
-  `- ${priority}: ${tasks.filter(t => t.priority === priority).length} tasks`
-).join('\n')}`;
+  `• ${priority}: ${tasks.filter(t => t.priority === priority).length} tasks`
+).join('\n')}
+
+Board Details:
+${boardMetrics}
+${boardTaskDetails}
+${conversationHistory}
+`;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -175,14 +285,14 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
           'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: selectedModel,
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'system', content: `Current context:\n${context}` },
+            { role: 'system', content: `Current context:${context}` },
             ...messages.map(m => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMessage }
           ],
-          temperature: 0.7,
+          temperature: 0.6,
         }),
       });
 
@@ -229,46 +339,59 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                 SupaKan AI
               </h1>
               <p className="text-muted-foreground text-lg max-w-[600px] leading-relaxed">
-                Your intelligent companion for task and team management, powered by advanced AI
+                Your intelligent companion for task, board, and team management, powered by advanced AI
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Button 
-                variant="outline" 
-                size="icon" 
+                className="hover:bg-primary/10 transition-colors"
                 onClick={handleRefreshData} 
                 title="Refresh Data"
-                className="hover:bg-primary/10 transition-colors"
               >
                 <RefreshCcw className="h-4 w-4" />
               </Button>
               <Button 
-                variant="outline" 
-                size="icon" 
+                className="hover:bg-primary/10 transition-colors"
                 onClick={handleClearChat} 
                 title="Clear Chat"
-                className="hover:bg-primary/10 transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
               <Dialog open={showSettings} onOpenChange={setShowSettings}>
                 <DialogTrigger asChild>
                   <Button 
-                    variant="outline" 
-                    size="icon"
                     className="hover:bg-primary/10 transition-colors"
                   >
                     <Settings2 className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>AI Assistant Settings</DialogTitle>
                     <DialogDescription>
-                      Configure your OpenAI API key and preferences
+                      Configure your OpenAI API key and model preferences
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label>AI Model</Label>
+                      <Select value={selectedModel} onValueChange={handleModelChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AI_MODELS.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{model.name}</span>
+                                <span className="text-xs text-muted-foreground">{model.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="grid gap-2">
                       <Label htmlFor="apiKey">OpenAI API Key</Label>
                       <Input
@@ -292,8 +415,8 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                   </div>
                   <DialogFooter>
                     <Button onClick={(e) => {
-                      const input = (e.currentTarget.parentElement?.parentElement?.querySelector('#apiKey') as HTMLInputElement);
-                      handleSaveApiKey(input.value);
+                      const input = (e.currentTarget.parentElement?.parentElement?.querySelector('#apiKey') as HTMLInputElement)?.value || '';
+                      handleSaveApiKey(input);
                     }}>
                       Save Settings
                     </Button>
@@ -354,7 +477,7 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
               Chat with SupaKan AI
             </CardTitle>
             <CardDescription>
-              Ask questions about your tasks, teams, and get AI-powered insights
+              Ask questions about your tasks, boards, teams, and get AI-powered insights
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden p-0">
@@ -419,7 +542,10 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={apiKey ? "Ask anything about your tasks and teams..." : "Please set your OpenAI API key first"}
+                placeholder={apiKey ? 
+                  "Ask anything about your tasks, boards, and teams..." : 
+                  "Please set your OpenAI API key in settings..."
+                }
                 disabled={!apiKey || loading}
                 className="flex-1 bg-background/50 backdrop-blur-sm"
               />
@@ -452,11 +578,10 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                 {EXAMPLE_PROMPTS.map((prompt, index) => (
                   <Button
                     key={index}
-                    variant="ghost"
-                    className="justify-start h-9 w-full hover:bg-primary/10 transition-colors"
+                    className="justify-start h-9 w-full bg-muted/50 hover:bg-muted/80 text-muted-foreground transition-colors"
                     onClick={() => setInput(prompt)}
                   >
-                    <Sparkles className="h-3 w-3 shrink-0 mr-2 text-primary" />
+                    <Sparkles className="h-3 w-3 shrink-0 mr-2 text-primary/50" />
                     <span className="text-sm text-left line-clamp-1">{prompt}</span>
                   </Button>
                 ))}
@@ -477,7 +602,7 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                 Powered by OpenAI's GPT-3.5, integrated with SupaKan by Nubs Carson
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" asChild className="flex-1 hover:bg-primary/10 transition-colors">
+                <Button className="flex-1 hover:bg-primary/10 transition-colors" asChild>
                   <a 
                     href="https://github.com/NubsCarson/SupaKan" 
                     target="_blank"
@@ -488,7 +613,7 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                     GitHub
                   </a>
                 </Button>
-                <Button variant="outline" size="sm" asChild className="flex-1 hover:bg-primary/10 transition-colors">
+                <Button className="flex-1 hover:bg-primary/10 transition-colors" asChild>
                   <a 
                     href="https://twitter.com/monerosolana" 
                     target="_blank"
