@@ -3,7 +3,6 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { getUserTeams } from '@/lib/teams';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
@@ -30,11 +29,6 @@ type MessageWithUser = Message & {
     updated_at: string;
   } | null;
 };
-
-// Type guard to check if the payload has an ID
-function hasId(obj: any): obj is { id: string } {
-  return obj && typeof obj.id === 'string';
-}
 
 interface ChatPanelProps {
   boardId: string;

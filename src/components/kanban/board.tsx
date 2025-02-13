@@ -270,11 +270,6 @@ export function Board() {
     task.status !== 'done'
   ).length;
 
-  const todoTasks = tasks.filter(task => task.status === 'todo');
-  const inProgressTasks = tasks.filter(task => task.status === 'in_progress');
-  const inReviewTasks = tasks.filter(task => task.status === 'in_review');
-  const doneTasks = tasks.filter(task => task.status === 'done');
-
   return (
     <div className="flex flex-col h-[calc(100vh-7.5rem)]">
       {/* Enhanced Header Section */}
