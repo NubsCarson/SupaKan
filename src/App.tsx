@@ -8,7 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ModeToggle } from '@/components/mode-toggle';
 import { Footer } from '@/components/footer';
-import { Github, Gauge, LogOut, Settings, User, ChevronDown, Home, Users, Sparkles } from 'lucide-react';
+import { Github, Gauge, LogOut, Settings, User, ChevronDown, Home, Users, Sparkles, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
-import { createBrowserRouter, createRoutesFromElements, RouterProvider, type RouterOptions } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { SystemDashboard } from '@/components/system-dashboard';
 import AuthCallback from '@/routes/auth/callback';
 import { Logo } from '@/components/logo';
@@ -38,8 +38,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import BoardsPage from '@/pages/boards';
 import TeamsPage from '@/pages/teams';
-import BoardPage from '@/pages/board';
 import AIPage from '@/pages/ai';
+import AddonsPage from '@/pages/addons';
 
 function LoadingSpinner() {
   return (
@@ -143,6 +143,14 @@ function Layout() {
                 >
                   <Sparkles className="h-5 w-5" />
                   <span className="hidden sm:inline-block">AI Assistant</span>
+                </Link>
+                <Link 
+                  to="/addons" 
+                  className="transition-colors hover:text-foreground/80 flex items-center gap-2"
+                  title="Community Add-ons"
+                >
+                  <Package className="h-5 w-5" />
+                  <span className="hidden sm:inline-block">Add-ons</span>
                 </Link>
               </nav>
             )}
@@ -250,16 +258,11 @@ const router = createBrowserRouter(
       <Route path="teams" element={<ProtectedRoute><TeamsPage /></ProtectedRoute>} />
       <Route path="dashboard" element={<ProtectedRoute><SystemDashboard /></ProtectedRoute>} />
       <Route path="ai" element={<ProtectedRoute><AIPage /></ProtectedRoute>} />
+      <Route path="addons" element={<ProtectedRoute><AddonsPage /></ProtectedRoute>} />
       <Route path="auth/callback" element={<AuthCallback />} />
       <Route path="*" element={<Navigate to="/boards" replace />} />
     </Route>
-  ),
-  {
-    future: {
-      v7_startTransition: true,
-      v7_relativeSplatPath: true
-    } satisfies RouterOptions['future']
-  }
+  )
 );
 
 export default function App() {

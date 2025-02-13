@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
-import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users, Keyboard, Eye, Grid3X3, ListFilter } from 'lucide-react';
+import { Plus, Loader2, MoreVertical, Pencil, Trash2, Calendar, Search, Layout, Star, Clock, ArrowUpRight, Filter, SortAsc, LayoutGrid, Clock4, CheckCircle, AlertTriangle, Users, Keyboard, Eye, Grid3X3, ListFilter, User, ArrowLeft, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import {
@@ -45,12 +45,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import type { Database } from '@/lib/database.types';
 import { PROJECT_TEMPLATES, type BoardTemplate } from '@/lib/templates';
 import { createShortcuts, isInputElement } from '@/lib/keyboard-shortcuts';
 import { KeyboardShortcutsHelp } from '@/components/keyboard-shortcuts-help';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 interface Board {
   id: string;
@@ -79,12 +83,44 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<BoardTemplate | null>(null);
+  const [myTemplates, setMyTemplates] = useState<BoardTemplate[]>([]);
+  const [activeTab, setActiveTab] = useState("my-templates");
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     loadTeams();
+    // Load saved templates from localStorage
+    const savedTemplates = localStorage.getItem('my-templates');
+    if (savedTemplates) {
+      setMyTemplates(JSON.parse(savedTemplates));
+    }
   }, []);
+
+  const addToMyTemplates = (template: BoardTemplate) => {
+    const newTemplates = [...myTemplates, template];
+    setMyTemplates(newTemplates);
+    localStorage.setItem('my-templates', JSON.stringify(newTemplates));
+    toast({
+      title: "Template Added",
+      description: "Template has been added to your collection.",
+    });
+  };
+
+  const removeFromMyTemplates = (templateId: string) => {
+    const newTemplates = myTemplates.filter(t => t.id !== templateId);
+    setMyTemplates(newTemplates);
+    localStorage.setItem('my-templates', JSON.stringify(newTemplates));
+    if (selectedTemplate?.id === templateId) {
+      setSelectedTemplate(null);
+    }
+    toast({
+      title: "Template Removed",
+      description: "Template has been removed from your collection.",
+    });
+  };
 
   async function loadTeams() {
     try {
@@ -185,7 +221,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
           <DialogTitle>Create New Board</DialogTitle>
           <DialogDescription>
@@ -230,34 +266,251 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
             </div>
             <div className="grid gap-2">
               <Label>Template (Optional)</Label>
-              <div className="grid grid-cols-2 gap-4">
-                {PROJECT_TEMPLATES.map((template) => (
-                  <Card
-                    key={template.id}
-                    className={cn(
-                      "cursor-pointer transition-all hover:border-primary",
-                      selectedTemplate?.id === template.id && "border-primary bg-primary/5"
-                    )}
-                    onClick={() => setSelectedTemplate(
-                      selectedTemplate?.id === template.id ? null : template
-                    )}
-                  >
-                    <CardHeader className="space-y-0 pb-2">
-                      <CardTitle className="text-base">
-                        {template.icon} {template.name}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        {template.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-xs text-muted-foreground">
-                        Includes {template.tasks.length} predefined tasks
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="my-templates" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    My Templates
+                  </TabsTrigger>
+                  <TabsTrigger value="community" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Community Templates
+                  </TabsTrigger>
+                </TabsList>
+                <div className="mt-4 relative">
+                  <TabsContent value="my-templates" className="space-y-4">
+                    {myTemplates.length === 0 ? (
+                      <Card className="flex flex-col items-center justify-center p-8 text-center">
+                        <div className="rounded-full bg-primary/10 p-3 mb-4">
+                          <Plus className="h-6 w-6 text-primary" />
+                        </div>
+                        <h3 className="font-semibold mb-2">No Templates Yet</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Add templates from the community collection to use them in your projects.
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          className="gap-2"
+                          onClick={() => setActiveTab("community")}
+                        >
+                          <Users className="h-4 w-4" />
+                          Browse Community Templates
+                        </Button>
+                      </Card>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {myTemplates.map((template) => (
+                          <Card
+                            key={template.id}
+                            className={cn(
+                              "cursor-pointer transition-all hover:border-primary relative overflow-hidden group",
+                              selectedTemplate?.id === template.id && "border-primary bg-primary/5"
+                            )}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <CardHeader className="space-y-0 pb-2">
+                              <CardTitle className="text-base flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{template.icon}</span>
+                                  {template.name}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {myTemplates.some(t => t.id === template.id) && (
+                                    <Check className="h-4 w-4 text-green-500" />
+                                  )}
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const isAlreadyAdded = myTemplates.some(t => t.id === template.id);
+                                      if (isAlreadyAdded) {
+                                        toast({
+                                          title: "Already Added",
+                                          description: "This template is already in your collection.",
+                                        });
+                                      } else {
+                                        addToMyTemplates(template);
+                                        toast({
+                                          title: "Template Added",
+                                          description: "Template has been added to your collection. Switch to My Templates to view it.",
+                                        });
+                                        setActiveTab("my-templates");
+                                      }
+                                    }}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    Add to My Templates
+                                  </Button>
+                                </div>
+                              </CardTitle>
+                              <CardDescription className="text-xs">
+                                {template.description}
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-xs text-muted-foreground">
+                                Includes {template.tasks.length} predefined tasks
+                              </div>
+                            </CardContent>
+                            <motion.div
+                              className="absolute inset-0 cursor-pointer z-10"
+                              onClick={() => setSelectedTemplate(
+                                selectedTemplate?.id === template.id ? null : template
+                              )}
+                              whileHover={{ scale: 1.02 }}
+                              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            />
+                          </Card>
+                        ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="community" className="space-y-4">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            placeholder="Search templates..."
+                            className="pl-9"
+                            value={templateSearch}
+                            onChange={(e) => setTemplateSearch(e.target.value)}
+                          />
+                        </div>
+                        <Tabs defaultValue="all" className="w-[600px]">
+                          <TabsList className="grid w-full grid-cols-6">
+                            <TabsTrigger value="all" onClick={() => setSelectedCategory("all")}>All</TabsTrigger>
+                            <TabsTrigger value="development" onClick={() => setSelectedCategory("development")}>Dev</TabsTrigger>
+                            <TabsTrigger value="business" onClick={() => setSelectedCategory("business")}>Business</TabsTrigger>
+                            <TabsTrigger value="design" onClick={() => setSelectedCategory("design")}>Design</TabsTrigger>
+                            <TabsTrigger value="finance" onClick={() => setSelectedCategory("finance")}>Finance</TabsTrigger>
+                            <TabsTrigger value="personal" onClick={() => setSelectedCategory("personal")}>Personal</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {PROJECT_TEMPLATES
+                          .filter(template => {
+                            // Filter by search query
+                            const searchMatch = templateSearch.trim() === '' || 
+                              template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                              template.description.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                              template.tasks.some(task => 
+                                task.title.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                                task.description.toLowerCase().includes(templateSearch.toLowerCase())
+                              );
+
+                            // Filter by category
+                            const categoryMatch = selectedCategory === 'all' || 
+                              (selectedCategory === 'development' && ['web-development'].includes(template.id)) ||
+                              (selectedCategory === 'business' && ['marketing-campaign', 'product-launch'].includes(template.id)) ||
+                              (selectedCategory === 'design' && ['product-design'].includes(template.id)) ||
+                              (selectedCategory === 'finance' && ['finance-management'].includes(template.id)) ||
+                              (selectedCategory === 'personal' && ['personal-tasks'].includes(template.id));
+
+                            return searchMatch && categoryMatch;
+                          })
+                          .map((template) => (
+                            <Card
+                              key={template.id}
+                              className={cn(
+                                "cursor-pointer transition-all hover:border-primary relative overflow-hidden group",
+                                selectedTemplate?.id === template.id && "border-primary bg-primary/5"
+                              )}
+                            >
+                              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                              <CardHeader className="space-y-0 pb-2">
+                                <CardTitle className="text-base flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">{template.icon}</span>
+                                    {template.name}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {myTemplates.some(t => t.id === template.id) && (
+                                      <Check className="h-4 w-4 text-green-500" />
+                                    )}
+                                    <Button
+                                      variant="secondary"
+                                      size="sm"
+                                      className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const isAlreadyAdded = myTemplates.some(t => t.id === template.id);
+                                        if (isAlreadyAdded) {
+                                          toast({
+                                            title: "Already Added",
+                                            description: "This template is already in your collection.",
+                                          });
+                                        } else {
+                                          addToMyTemplates(template);
+                                          toast({
+                                            title: "Template Added",
+                                            description: "Template has been added to your collection. Switch to My Templates to view it.",
+                                          });
+                                          setActiveTab("my-templates");
+                                        }
+                                      }}
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                      Add to My Templates
+                                    </Button>
+                                  </div>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                  {template.description}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="text-xs text-muted-foreground">
+                                  Includes {template.tasks.length} predefined tasks
+                                </div>
+                                <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Users className="h-3 w-3" />
+                                  <span>Community Template</span>
+                                </div>
+                              </CardContent>
+                              <motion.div
+                                className="absolute inset-0 cursor-pointer z-10"
+                                onClick={() => setSelectedTemplate(
+                                  selectedTemplate?.id === template.id ? null : template
+                                )}
+                                whileHover={{ scale: 1.02 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                              />
+                            </Card>
+                          ))}
+                      </div>
+
+                      {PROJECT_TEMPLATES.filter(template => {
+                        const searchMatch = templateSearch.trim() === '' || 
+                          template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                          template.description.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                          template.tasks.some(task => 
+                            task.title.toLowerCase().includes(templateSearch.toLowerCase()) ||
+                            task.description.toLowerCase().includes(templateSearch.toLowerCase())
+                          );
+
+                        const categoryMatch = selectedCategory === 'all' || 
+                          (selectedCategory === 'development' && ['web-development'].includes(template.id)) ||
+                          (selectedCategory === 'business' && ['marketing-campaign', 'product-launch'].includes(template.id)) ||
+                          (selectedCategory === 'design' && ['product-design'].includes(template.id)) ||
+                          (selectedCategory === 'finance' && ['finance-management'].includes(template.id)) ||
+                          (selectedCategory === 'personal' && ['personal-tasks'].includes(template.id));
+
+                        return searchMatch && categoryMatch;
+                      }).length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>No templates found matching your search criteria.</p>
+                          <p>Try adjusting your search terms or category filter.</p>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </div>
+              </Tabs>
             </div>
           </div>
           <DialogFooter>
@@ -269,8 +522,18 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Board'}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Board'
+              )}
             </Button>
           </DialogFooter>
         </form>
