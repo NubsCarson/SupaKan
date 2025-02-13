@@ -105,7 +105,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
     localStorage.setItem('my-templates', JSON.stringify(newTemplates));
     toast({
       title: "Template Added",
-      description: "Template has been added to your collection.",
+      description: "Template has been added to your collection. Switch to My Templates to view it.",
     });
   };
 
@@ -315,33 +315,18 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                                   {template.name}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {myTemplates.some(t => t.id === template.id) && (
-                                    <Check className="h-4 w-4 text-green-500" />
-                                  )}
                                   <Button
                                     variant="secondary"
                                     size="sm"
-                                    className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative"
+                                    className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative z-30"
                                     onClick={(e) => {
+                                      e.preventDefault();
                                       e.stopPropagation();
-                                      const isAlreadyAdded = myTemplates.some(t => t.id === template.id);
-                                      if (isAlreadyAdded) {
-                                        toast({
-                                          title: "Already Added",
-                                          description: "This template is already in your collection.",
-                                        });
-                                      } else {
-                                        addToMyTemplates(template);
-                                        toast({
-                                          title: "Template Added",
-                                          description: "Template has been added to your collection. Switch to My Templates to view it.",
-                                        });
-                                        setActiveTab("my-templates");
-                                      }
+                                      removeFromMyTemplates(template.id);
                                     }}
                                   >
-                                    <Plus className="h-4 w-4" />
-                                    Add to My Templates
+                                    <Trash2 className="h-4 w-4" />
+                                    Remove Template
                                   </Button>
                                 </div>
                               </CardTitle>
@@ -355,7 +340,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                               </div>
                             </CardContent>
                             <motion.div
-                              className="absolute inset-0 cursor-pointer z-10"
+                              className="absolute inset-0 cursor-pointer z-20"
                               onClick={() => setSelectedTemplate(
                                 selectedTemplate?.id === template.id ? null : template
                               )}
@@ -373,7 +358,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                         <div className="relative flex-1">
                           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                           <Input
-                            placeholder="Search templates..."
+                            placeholder="Search"
                             className="pl-9"
                             value={templateSearch}
                             onChange={(e) => setTemplateSearch(e.target.value)}
@@ -435,8 +420,9 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                                     <Button
                                       variant="secondary"
                                       size="sm"
-                                      className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative"
+                                      className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity relative z-30"
                                       onClick={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         const isAlreadyAdded = myTemplates.some(t => t.id === template.id);
                                         if (isAlreadyAdded) {
@@ -473,7 +459,7 @@ function CreateBoardDialog({ open, onOpenChange, onCreateSuccess }: CreateBoardD
                                 </div>
                               </CardContent>
                               <motion.div
-                                className="absolute inset-0 cursor-pointer z-10"
+                                className="absolute inset-0 cursor-pointer z-20"
                                 onClick={() => setSelectedTemplate(
                                   selectedTemplate?.id === template.id ? null : template
                                 )}
