@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -62,6 +62,11 @@ export default function AIPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
     const savedApiKey = localStorage.getItem('openai_api_key');
@@ -70,6 +75,10 @@ export default function AIPage() {
     }
     loadData();
   }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   const loadData = async () => {
     try {
@@ -400,6 +409,7 @@ ${Array.from(new Set(tasks.map(t => t.priority))).map(priority =>
                       </div>
                     </motion.div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </AnimatePresence>
             </ScrollArea>
