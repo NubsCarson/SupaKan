@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
-import { Button, type ButtonProps } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/use-toast';
-import { Bot, Send, Key, Loader2, Settings2, Sparkles, Github, Twitter, RefreshCcw, Trash2, Info, Copy, Wand2, Brain, Zap, MessageSquare } from 'lucide-react';
+import { Bot, Send, Settings2, Sparkles, Github, Twitter, RefreshCcw, Trash2, Info, Copy, Wand2, Brain, Zap, MessageSquare, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,14 +17,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Database } from '@/lib/database.types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import * as DOMPurify from 'dompurify';
 
 type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -77,26 +75,15 @@ Be professional, friendly, and helpful.`;
 const stripHtml = (html: string) => {
   if (!html) return '';
   
-  // First pass: remove script tags and their content
-  let sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  
-  // Second pass: remove style tags and their content
-  sanitized = sanitized.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-  
-  // Third pass: remove all remaining HTML tags
-  sanitized = sanitized.replace(/<[^>]+>/g, '');
-  
-  // Fourth pass: remove potentially dangerous HTML entities
-  sanitized = sanitized
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
-  
-  // Finally, normalize whitespace
-  return sanitized.trim().replace(/\s+/g, ' ');
+  // Use DOMPurify to sanitize the HTML and remove all tags
+  const cleanHtml = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [], // Allow no HTML tags
+    ALLOWED_ATTR: [], // Allow no HTML attributes
+    KEEP_CONTENT: true, // Keep the text content
+  });
+
+  // Normalize whitespace
+  return cleanHtml.trim().replace(/\s+/g, ' ');
 };
 
 const formatDate = (date: string | null) => {
