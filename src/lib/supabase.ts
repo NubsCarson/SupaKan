@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Support both Vite and Next.js environment variable formats
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nlsoaeeejohyihhiytfi.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sc29hZWVlam9oeWloaGl5dGZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTEwOTU1NDIsImV4cCI6MjA2NjY3MTU0Mn0.TNdAP98gAG8xltKTDrKvWIrC6Tk9Ww15KVxmFz2SuB4';
 
 console.log('Supabase URL:', supabaseUrl);
 // Don't log the full key for security, just the first few characters
