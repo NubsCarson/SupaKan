@@ -94,3 +94,24 @@
   height: 0;
   pointer-events: none;
 }
+
+/* Fix auth dialog focus rings and borders */
+.auth-dialog * {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.auth-dialog *:focus,
+.auth-dialog *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  ring: none !important;
+}
+
+.auth-dialog input {
+  border: 1px solid hsl(var(--border)) !important;
+}
+
+.auth-dialog button[role="tab"][data-state="active"] {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+}

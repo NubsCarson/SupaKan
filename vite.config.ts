@@ -10,6 +10,20 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    include: ['lucide-react', '@remix-run/router'],
+    force: true,
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
+  },
+  server: {
+    fs: {
+      strict: false,
+    },
+    watch: {
+      usePolling: true,
+    },
   },
 });

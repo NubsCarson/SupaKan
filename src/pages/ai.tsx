@@ -22,7 +22,7 @@ import type { Database } from '@/lib/database.types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import * as DOMPurify from 'dompurify';
+import DOMPurify from 'dompurify';
 
 type Message = {
   role: 'user' | 'assistant' | 'system';
@@ -247,7 +247,7 @@ export default function AIPage() {
       }
 
       // Build conversation history from last 3 messages
-      const conversationHistory = messages.length > 0 ? '\n\nConversation History:\n' + messages.slice(-3).map(m => `${m.role}: ${m.content}`).join('\n') : '';
+      const conversationHistory = (messages || []).length > 0 ? '\n\nConversation History:\n' + (messages || []).slice(-3).map((m: Message) => `${m.role}: ${m.content}`).join('\n') : '';
 
       const context = `
 Current User:
@@ -296,7 +296,7 @@ ${conversationHistory}
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'system', content: `Current context:${context}` },
-            ...messages.map(m => ({ role: m.role, content: m.content })),
+            ...(messages || []).map((m: Message) => ({ role: m.role, content: m.content })),
             { role: 'user', content: userMessage }
           ],
           temperature: 0.6,

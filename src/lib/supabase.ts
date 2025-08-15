@@ -5,15 +5,27 @@ import type { Database } from './database.types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-console.log('Supabase URL:', supabaseUrl);
+console.log('Supabase URL:', supabaseUrl || '⚠️  NOT SET');
 // Don't log the full key for security, just the first few characters
-console.log('Supabase Key (first 8 chars):', supabaseAnonKey?.substring(0, 8));
+console.log('Supabase Key (first 8 chars):', supabaseAnonKey?.substring(0, 8) || '⚠️  NOT SET');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_ variants)');
+  console.warn('⚠️  Missing Supabase environment variables. Please copy .env.example to .env.local and set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+  console.info('📋 Steps to fix:');
+  console.info('1. Copy .env.example to .env.local');
+  console.info('2. Get your Supabase URL and anon key from https://app.supabase.com/project/_/settings/api');
+  console.info('3. Update VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
+  console.info('4. Restart the dev server');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+// Use fallback values if environment variables are missing (for demo purposes)
+const fallbackUrl = 'https://demo.supabase.co';
+const fallbackKey = 'demo-key-123';
+
+export const supabase = createClient<Database>(
+  supabaseUrl || fallbackUrl, 
+  supabaseAnonKey || fallbackKey, 
+  {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
