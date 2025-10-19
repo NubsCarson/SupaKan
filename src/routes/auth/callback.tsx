@@ -13,7 +13,15 @@ export default function AuthCallback() {
         navigate('/');
         return;
       }
-      navigate('/');
+
+      // Check for stored redirect URL (e.g., from team invite links)
+      const redirectUrl = sessionStorage.getItem('post_auth_redirect');
+      if (redirectUrl) {
+        sessionStorage.removeItem('post_auth_redirect');
+        navigate(redirectUrl);
+      } else {
+        navigate('/');
+      }
     };
 
     handleAuthCallback();

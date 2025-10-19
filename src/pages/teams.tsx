@@ -7,6 +7,7 @@ import { Plus, Loader2, Users, Crown, Settings, Mail, Copy, Check, UserPlus, Shi
 import { toast } from '@/components/ui/use-toast';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { Database } from '@/lib/database.types';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -316,20 +317,23 @@ function InviteMemberDialog({ open, onOpenChange, team, onInviteSuccess }: Invit
   const [copied, setCopied] = useState(false);
   const { user } = useAuth();
 
+  // Generate shareable invite URL
+  const inviteUrl = `${window.location.origin}/teams?invite=${team.id}`;
+
   const handleCopyInviteCode = async () => {
     try {
-      await navigator.clipboard.writeText(team.id);
+      await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       toast({
         title: 'Copied!',
-        description: 'Team invite code copied to clipboard',
+        description: 'Team invite link copied to clipboard',
       });
     } catch (error) {
       console.error('Failed to copy:', error);
       toast({
         title: 'Error',
-        description: 'Failed to copy invite code',
+        description: 'Failed to copy invite link',
         variant: 'destructive',
       });
     }
@@ -376,9 +380,9 @@ function InviteMemberDialog({ open, onOpenChange, team, onInviteSuccess }: Invit
         </DialogHeader>
         <div className="grid gap-6">
           <div className="space-y-4">
-            <Label>Team Invite Code</Label>
+            <Label>Team Invite Link</Label>
             <div className="flex items-center gap-2">
-              <Input value={team.id} readOnly />
+              <Input value={inviteUrl} readOnly className="font-mono text-sm" />
               <Button
                 type="button"
                 variant="outline"
@@ -392,6 +396,9 @@ function InviteMemberDialog({ open, onOpenChange, team, onInviteSuccess }: Invit
                 )}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Share this link with anyone you want to invite to the team. They'll automatically join after signing in.
+            </p>
           </div>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -445,6 +452,8 @@ export default function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [isLeaveTeamDialogOpen, setIsLeaveTeamDialogOpen] = useState(false);
   const [isDeleteTeamDialogOpen, setIsDeleteTeamDialogOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const loadTeams = async () => {
@@ -523,6 +532,98 @@ export default function TeamsPage() {
   useEffect(() => {
     loadTeams();
   }, [user?.id]);
+
+  // Handle invite code from URL parameter
+  useEffect(() => {
+    const handleInviteCode = async () => {
+      const inviteCode = searchParams.get('invite');
+      if (!inviteCode || !user) return;
+
+      try {
+        // Extract team ID from invite code and validate format
+        const teamId = inviteCode.trim();
+        if (!teamId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          throw new Error('Invalid invite link format');
+        }
+
+        // Verify team exists
+        const { data: team, error: teamError } = await supabase
+          .from('teams')
+          .select('id, name')
+          .eq('id', teamId)
+          .maybeSingle();
+
+        if (teamError) {
+          console.error('Team lookup error:', teamError);
+          throw new Error('Failed to verify team');
+        }
+
+        if (!team) {
+          throw new Error('Team not found. The invite link may be invalid or expired.');
+        }
+
+        // Check if already a member
+        const { data: existingMember, error: memberError } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (memberError) {
+          console.error('Member check error:', memberError);
+          throw new Error('Failed to verify membership');
+        }
+
+        if (existingMember) {
+          toast({
+            title: 'Already a member',
+            description: `You are already a member of ${team.name}`,
+          });
+          // Remove invite parameter from URL
+          searchParams.delete('invite');
+          setSearchParams(searchParams);
+          return;
+        }
+
+        // Join team as member
+        const { error: joinError } = await supabase
+          .from('team_members')
+          .insert({
+            team_id: teamId,
+            user_id: user.id,
+            role: 'member'
+          });
+
+        if (joinError) {
+          console.error('Join error:', joinError);
+          throw new Error('Failed to join team');
+        }
+
+        toast({
+          title: 'Welcome to the team!',
+          description: `You have successfully joined ${team.name}`,
+        });
+
+        // Remove invite parameter from URL and reload teams
+        searchParams.delete('invite');
+        setSearchParams(searchParams);
+        await loadTeams();
+      } catch (error) {
+        console.error('Error handling invite code:', error);
+        toast({
+          title: 'Error joining team',
+          description: error instanceof Error ? error.message : 'Failed to join team',
+          variant: 'destructive',
+        });
+        // Remove invalid invite parameter
+        searchParams.delete('invite');
+        setSearchParams(searchParams);
+      }
+    };
+
+    handleInviteCode();
+  }, [searchParams, user]);
 
   const handleLeaveTeam = async () => {
     if (!selectedTeam || !user) return;

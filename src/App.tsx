@@ -58,6 +58,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
+      // Store current URL including query params for post-auth redirect
+      const currentUrl = window.location.pathname + window.location.search;
+      if (currentUrl !== '/boards') {
+        sessionStorage.setItem('post_auth_redirect', currentUrl);
+      }
       setShowAuth(true);
     }
   }, [isAuthenticated, loading]);
@@ -76,13 +81,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function Layout() {
   const { user, isAuthenticated, loading } = useAuth();
   const { toast } = useToast();
-  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const handleSignOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       toast({
         title: "Signed out successfully",
         description: "Come back soon!",
@@ -211,7 +215,7 @@ function Layout() {
                       <span>Settings</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setShowSignOutConfirm(true)}>
+                    <DropdownMenuItem onClick={handleSignOut}>
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Sign out</span>
                     </DropdownMenuItem>
@@ -222,25 +226,6 @@ function Layout() {
           </div>
         </div>
       </header>
-      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You will need to sign in again to access your boards and tasks.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowSignOutConfirm(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleSignOut}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sign out
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <main className="flex-1">
         <Outlet />
       </main>
