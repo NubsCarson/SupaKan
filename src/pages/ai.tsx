@@ -24,6 +24,93 @@ import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DOMPurify from 'dompurify';
 
+// Simple encryption utilities for API key storage (obfuscation)
+// Note: This uses a hardcoded key and is for obfuscation, not true security
+const ENCRYPTION_KEY = 'SupaKan-2024-Secure-Storage-Key';
+
+async function encryptApiKey(plainText: string): Promise<string> {
+  const enc = new TextEncoder();
+  const keyMaterial = await window.crypto.subtle.importKey(
+    'raw',
+    enc.encode(ENCRYPTION_KEY),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  const salt = window.crypto.getRandomValues(new Uint8Array(16));
+  const key = await window.crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256'
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    enc.encode(plainText)
+  );
+
+  // Combine salt + iv + encrypted data and encode as base64
+  const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+  combined.set(salt, 0);
+  combined.set(iv, salt.length);
+  combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+
+  return btoa(String.fromCharCode(...combined));
+}
+
+async function decryptApiKey(encryptedData: string): Promise<string | null> {
+  try {
+    const enc = new TextEncoder();
+    const combined = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0));
+
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const data = combined.slice(28);
+
+    const keyMaterial = await window.crypto.subtle.importKey(
+      'raw',
+      enc.encode(ENCRYPTION_KEY),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveBits', 'deriveKey']
+    );
+
+    const key = await window.crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: salt,
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      true,
+      ['encrypt', 'decrypt']
+    );
+
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      data
+    );
+
+    return new TextDecoder().decode(decrypted);
+  } catch (error) {
+    console.error('Decryption failed:', error);
+    return null;
+  }
+}
+
 type Message = {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -118,12 +205,27 @@ export default function AIPage() {
   };
 
   useEffect(() => {
-    const savedApiKey = localStorage.getItem('openai_api_key');
-    const savedModel = localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
-    setSelectedModel(savedModel);
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-    }
+    const loadApiKey = async () => {
+      const savedApiKey = localStorage.getItem('openai_api_key');
+      const savedModel = localStorage.getItem('ai_model') || 'gpt-3.5-turbo';
+      setSelectedModel(savedModel);
+
+      if (savedApiKey) {
+        // Try to decrypt the key (new format)
+        const decrypted = await decryptApiKey(savedApiKey);
+        if (decrypted) {
+          setApiKey(decrypted);
+        } else {
+          // If decryption fails, it might be an old plaintext key
+          // Migrate it to encrypted format
+          setApiKey(savedApiKey);
+          const encrypted = await encryptApiKey(savedApiKey);
+          localStorage.setItem('openai_api_key', encrypted);
+        }
+      }
+    };
+
+    loadApiKey();
     loadData();
   }, []);
 
@@ -174,13 +276,15 @@ export default function AIPage() {
     }
   };
 
-  const handleSaveApiKey = (newApiKey: string) => {
+  const handleSaveApiKey = async (newApiKey: string) => {
     setApiKey(newApiKey);
-    localStorage.setItem('openai_api_key', newApiKey);
+    // Encrypt the API key before storing
+    const encrypted = await encryptApiKey(newApiKey);
+    localStorage.setItem('openai_api_key', encrypted);
     setShowSettings(false);
     toast({
       title: 'Success',
-      description: 'API key saved successfully',
+      description: 'API key encrypted and saved successfully',
     });
   };
 
