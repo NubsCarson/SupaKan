@@ -93,7 +93,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] focus:outline-none !border-0 focus:ring-0 focus:ring-offset-0 auth-dialog">
+      <DialogContent className="sm:max-w-[400px] focus:outline-none !border-0 focus:ring-0 focus:ring-offset-0 auth-dialog" hideCloseButton noBackdrop>
         <DialogHeader>
           <DialogTitle>Welcome to SupaKan</DialogTitle>
           <DialogDescription>
