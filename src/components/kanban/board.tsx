@@ -376,8 +376,7 @@ export function Board() {
                         {...provided.droppableProps}
                         className={cn(
                           "flex-1 p-2 transition-colors duration-200",
-                          "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600",
-                          "hover:scrollbar-thumb-gray-500 dark:hover:scrollbar-thumb-gray-500",
+                          "scrollbar-thin",
                           snapshot.isDraggingOver && "bg-muted/50 ring-2 ring-primary/20"
                         )}
                         style={{

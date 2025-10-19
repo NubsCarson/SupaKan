@@ -597,6 +597,18 @@ export default function TeamsPage() {
 
         if (joinError) {
           console.error('Join error:', joinError);
+          // Check if error is due to duplicate membership
+          if (joinError.code === '23505') {
+            toast({
+              title: 'Already a member',
+              description: `You are already a member of ${team.name}`,
+            });
+            // Remove invite parameter from URL
+            searchParams.delete('invite');
+            setSearchParams(searchParams);
+            await loadTeams();
+            return;
+          }
           throw new Error('Failed to join team');
         }
 
@@ -609,7 +621,7 @@ export default function TeamsPage() {
         searchParams.delete('invite');
         setSearchParams(searchParams);
         await loadTeams();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error handling invite code:', error);
         toast({
           title: 'Error joining team',
