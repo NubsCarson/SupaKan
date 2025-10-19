@@ -10,21 +10,32 @@ console.log('Supabase URL:', supabaseUrl || '⚠️  NOT SET');
 console.log('Supabase Key (first 8 chars):', supabaseAnonKey?.substring(0, 8) || '⚠️  NOT SET');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('⚠️  Missing Supabase environment variables. Please copy .env.example to .env.local and set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-  console.info('📋 Steps to fix:');
-  console.info('1. Copy .env.example to .env.local');
-  console.info('2. Get your Supabase URL and anon key from https://app.supabase.com/project/_/settings/api');
-  console.info('3. Update VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
-  console.info('4. Restart the dev server');
+  const errorMessage = `
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                   ⚠️  SUPABASE CONFIGURATION MISSING                      ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Please configure your Supabase credentials in .env.local:
+
+📋 Steps to fix:
+  1. Open the .env.local file in the project root
+  2. Get your Supabase URL and anon key from:
+     👉 https://app.supabase.com/project/_/settings/api
+  3. Replace the placeholder values in .env.local:
+     VITE_SUPABASE_URL=your_project_url_here
+     VITE_SUPABASE_ANON_KEY=your_anon_key_here
+  4. Restart the dev server (npm run dev)
+
+Missing: ${!supabaseUrl ? 'VITE_SUPABASE_URL' : ''} ${!supabaseAnonKey ? 'VITE_SUPABASE_ANON_KEY' : ''}
+  `;
+
+  console.error(errorMessage);
+  throw new Error('Supabase configuration missing. Check the console for setup instructions.');
 }
 
-// Use fallback values if environment variables are missing (for demo purposes)
-const fallbackUrl = 'https://demo.supabase.co';
-const fallbackKey = 'demo-key-123';
-
 export const supabase = createClient<Database>(
-  supabaseUrl || fallbackUrl, 
-  supabaseAnonKey || fallbackKey, 
+  supabaseUrl,
+  supabaseAnonKey, 
   {
   auth: {
     persistSession: true,
